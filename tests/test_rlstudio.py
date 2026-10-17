@@ -20,7 +20,7 @@ def store(tmp_path):
 # -- gestion de projets -------------------------------------------------------------------
 def test_templates_are_listed(store):
     ids = {t[0] for t in store.list_templates()}
-    assert {"python_blank", "simulink_blank", "cartpole"} <= ids
+    assert {"python_blank", "simulink_blank", "cartpole", "cartpole_simulink"} <= ids
 
 
 def test_project_crud(store):

@@ -10,7 +10,11 @@ from pathlib import Path
 
 ALLOWED_QT_MODULES = {"Core", "Gui", "Widgets", "Network", "OpenGL", "OpenGLWidgets", "Svg", "Test"}  # LGPL v3
 ALLOWED_PLUGIN_DIRS = {"platforms", "styles", "imageformats", "iconengines"}
-REQUIRED_FILES = ["LICENSE", "THIRD_PARTY_NOTICES.md", "licenses/LGPL-3.0.txt", "licenses/GPL-3.0.txt"]
+REQUIRED_FILES = [
+    "LICENSE", "THIRD_PARTY_NOTICES.md", "licenses/LGPL-3.0.txt", "licenses/GPL-3.0.txt",
+    # le modele Simulink du template est un travail tiers (MIT) : son avis de copyright doit accompagner chaque copie
+    "resources/templates/cartpole_simulink/LICENSE-modele.txt",
+]
 
 
 def check(bundle) -> list[str]:

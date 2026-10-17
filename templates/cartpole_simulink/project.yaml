@@ -1,0 +1,32 @@
+template_name: Pendule inverse (Simulink)
+template_description: "Pendule inverse sur chariot modelise dans Simulink (modele MIT de Jitendra Singh, adapte). Exemple complet de projet Simulink : action = force du chariot, 4 observations, etat initial aleatoire, recompense et arret anticipe en expressions."
+name: Pendule inverse (Simulink)
+description: Maintenir le pendule vertical en poussant le chariot. Modele physique dans pendulum.slx (voir SOURCE.md pour l'origine et la licence).
+kind: simulink
+env:
+  model: pendulum.slx
+  step_s: 0.02            # un pas de decision = 2 pas du solveur (0,01 s)
+  episode_s: 10           # 500 pas par episode
+  actions:
+    # force appliquee au chariot [N] : parametre Value de la constante qui alimente le modele
+    - {name: force, block: "pendulum/Force_cmd", param: Value, low: -5.0, high: 5.0}
+  observations:
+    # signaux du modele ; theta = angle par rapport a la VERTICALE (0 = pendule droit), via le bloc Angle_up
+    - {name: x, block: "pendulum/Inverted Pendulum System", port: 1}
+    - {name: theta, block: "pendulum/Angle_up", port: 1}
+    - {name: x_dot, block: "pendulum/Inverted Pendulum System", port: 3}
+    - {name: theta_dot, block: "pendulum/Inverted Pendulum System", port: 4}
+  initial:
+    # variables du workspace du modele, tirees au hasard a chaque episode (theta0 : ecart initial a la verticale ;
+    # pour un « swing-up » depuis la position pendante, elargir a [-3.14, 3.14])
+    - {variable: theta0, low: -0.15, high: 0.15}
+    - {variable: x0, low: -0.1, high: 0.1}
+  reward: "1.0 - theta**2 - 0.05*x**2 - 0.001*force**2"
+  terminate: "abs(theta) > 0.6 or abs(x) > 1.0"
+algo:
+  name: SAC
+  total_timesteps: 30000
+  seed: 0
+  device: cpu
+  baseline_episodes: 1      # chaque episode dure plusieurs dizaines de secondes avec Simulink
+  kwargs: {}

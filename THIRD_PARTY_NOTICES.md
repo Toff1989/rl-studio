@@ -64,7 +64,18 @@ pas et chacun reste soumis à sa propre licence, que l'utilisateur accepte aupr�
 | NumPy, PyYAML | voir ci-dessus | PyPI |
 | `matlabengine` (MATLAB Engine API for Python) | **Licence MathWorks** | PyPI |
 
-## 5. MATLAB et Simulink
+## 5. Modèle Simulink du template `cartpole_simulink`
+
+Le modèle `templates/cartpole_simulink/pendulum.slx` est **dérivé** d'un travail tiers sous licence MIT :
+
+| | |
+|---|---|
+| Œuvre d'origine | `IP_Nonlinear_model.slx` — <https://github.com/jitendra825/Inverted-Pendulum-Simulink> (commit `b34c2f7579d93626e06abe5a337bf8e9f913a04b`) |
+| Copyright | © 2021 Jitendra Singh |
+| Licence | **MIT** — texte d'origine conservé dans `templates/cartpole_simulink/LICENSE-modele.txt`, qui accompagne le modèle dans chaque projet créé ou exporté (`.rls`) |
+| Modifications | animation retirée, entrée de force pilotable, angle mesuré depuis la verticale, paramètres dans le modèle : voir `templates/cartpole_simulink/SOURCE.md` et `tools/build_cartpole_simulink.m` |
+
+## 6. MATLAB et Simulink
 
 RL Studio **ne contient ni ne redistribue** MATLAB ni Simulink. L'intégration (explorateur de blocs, simulation pas
 à pas) nécessite une installation de MATLAB/Simulink **avec licence valide de l'utilisateur**. Les scripts
@@ -74,7 +85,7 @@ RL Studio **ne contient ni ne redistribue** MATLAB ni Simulink. L'intégration (
 > de NVIDIA Corporation. Python est une marque de la Python Software Foundation. Ces noms ne sont utilisés que
 > pour désigner les logiciels compatibles ; RL Studio n'est ni affilié à ces sociétés ni approuvé par elles.
 
-## 6. Outil de construction
+## 7. Outil de construction
 
 L'installateur est produit avec [Inno Setup](https://jrsoftware.org/isinfo.php), dont la licence autorise la
 distribution libre des installateurs générés.

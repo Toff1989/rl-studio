@@ -32,7 +32,7 @@
 
 ```
 projects/<projet>/        un dossier par projet : project.yaml, env.py / model.slx, runs/
-templates/                modèles de départ : python_blank, cartpole, simulink_blank
+templates/                modèles de départ : python_blank, cartpole, simulink_blank, cartpole_simulink
 matlab/                   rlstudio_step.m (simulation pas à pas), rlstudio_inspect.m (explorateur)
 src/rlstudio/             project.py, archive.py (.rls), envs/, training.py, worker.py, components.py, hardware.py, gui/
 packaging/                PyInstaller + Inno Setup : voir packaging/README.md

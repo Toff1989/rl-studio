@@ -6,6 +6,13 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+### Ajouté
+- **Template `cartpole_simulink`** : pendule inverse sur chariot modélisé dans Simulink, exemple complet de projet
+  Simulink (action = force du chariot, 4 observations, état initial aléatoire, récompense et arrêt anticipé en
+  expressions). Basé sur un modèle MIT de Jitendra Singh, adapté par le script reproductible
+  `tools/build_cartpole_simulink.m` ; licence d'origine et provenance fournies avec le template. Validé avec MATLAB R2026b :
+  le pendule tombe en boucle ouverte, un LQR dérivé du modèle le stabilise (force maximale < 1 N sur une borne de 5 N).
+
 ### Modifié
 - **Nouvelle icône** : boucle agent/environnement et point de récompense, dessinée taille par taille
   (`icon.ico` contient désormais 16, 20, 24, 32, 40, 48, 64, 128 et 256 px au lieu d'une seule taille) ; elle apparaît
