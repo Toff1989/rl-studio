@@ -84,3 +84,27 @@ def test_series_plot_and_eval_tab(trained, tmp_path):
     tab._on_episode({"n": 1, "reward": 3.0, "length": 5, "terminated": False})
     assert tab.k_mean.value.text() == "3.00"
     app.processEvents()
+
+
+def test_series_plot_many_signals_distinct_colors_and_toggle():
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+
+    from rlstudio.gui.live_plots import SeriesPlot, palette
+
+    app = QApplication.instance() or QApplication([])
+    cols = palette(20)
+    assert len(set(cols)) == 20  # une couleur distincte par signal
+    pl = SeriesPlot("Observations")
+    pl.set_names([f"s{i}" for i in range(14)])
+    pl.append(0, list(range(14)))
+    assert len(pl.curves) == 14 and len(pl.legend.chips) == 15  # 14 signaux + « tout masquer / afficher »
+    pl.legend.chips[2].toggled.emit(False)  # masque la courbe s2
+    assert not pl.curves[2].isVisible() and pl.curves[1].isVisible()
+    pl.set_names([f"s{i}" for i in range(14)] + ["extra"])  # reconstruction : le masquage est conserve
+    assert not pl.curves[2].isVisible()
+    pl._set_all_visible(False)
+    assert not any(c.isVisible() for c in pl.curves)
+    pl._set_all_visible(True)
+    assert all(c.isVisible() for c in pl.curves)
+    app.processEvents()
