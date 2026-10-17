@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.3.1-4f7cf0">
+  <img alt="version" src="https://img.shields.io/badge/version-0.3.2-4f7cf0">
   <img alt="licence MIT" src="https://img.shields.io/badge/licence-MIT-3ecf8e">
   <img alt="Python 3.12" src="https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white">
   <img alt="Windows" src="https://img.shields.io/badge/plateforme-Windows-0078D6?logo=windows&logoColor=white">
@@ -25,6 +25,7 @@
 
 - **Gestion de projets** : créer, dupliquer, renommer, supprimer (corbeille récupérable), un dossier par projet.
 - **Deux types d'environnements** : Python (`gymnasium.Env`) ou modèle Simulink décrit sans code (signaux, paramètres, récompense).
+- **Conversion d'un modèle Simulink existant** : le bouton *Convertir un modèle Simulink…* (barre latérale) analyse un `.slx`, propose entrées → actions et sorties → observations, puis crée un projet avec une **copie** adaptée du modèle (l'original n'est jamais modifié) et la teste à vide.
 - **Partage** : export/import de projets en un seul fichier **`.rls`** (double-clic ou glisser-déposer).
 - **Entraînement** en direct (récompense, observation, actions) avec comparaison à une politique de référence.
 - **Modèle mathématique** : extraction de la politique apprise sous forme de PID, table de gains, arbre de décision ou équation, validée en boucle fermée, exportable en Python / MATLAB / Simulink ([détails](docs/distillation.md)).
@@ -86,6 +87,8 @@ pendant l'entraînement (sinon : politique aléatoire).
 Le bouton **Explorer le modèle** ouvre un arbre des blocs (via MATLAB) pour ajouter d'un clic
 un signal en observation ou un paramètre en action. L'état du modèle est conservé d'un pas à
 l'autre côté MATLAB (état final → état initial), un seul appel `sim` par pas de décision.
+
+**Convertir un modèle existant** — le bouton *Convertir un modèle Simulink…* ouvre une fenêtre en quatre étapes : analyse du modèle (entrées, sorties, constantes, solveur, variables manquantes, blocs d'affichage), choix des actions et des observations, variables initiales aléatoires, puis pas de décision et récompense. La conversion enregistre une copie dans un nouveau projet : les entrées racine deviennent des constantes pilotables (`Rl_<nom>`), les sorties sont résolues vers le bloc qui les alimente, les scopes et affichages sont retirés, les variables du workspace sont embarquées dans le modèle (modèle autonome) et le solveur peut être passé à pas fixe. Un script `.m` ou un `.mat` d'initialisation peut être indiqué pour les modèles qui dépendent de variables définies hors du `.slx` (il est exécuté tel quel dans MATLAB). Un épisode court sur la copie vérifie que tout simule.
 
 Limites : signaux de bus non supportés ; un moteur MATLAB par environnement (pour
 paralléliser, un process par env). Simulink crée son dossier de cache `slprj` dans

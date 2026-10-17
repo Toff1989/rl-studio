@@ -6,8 +6,16 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.3.2] - 2026-10-17
+
+### Ajouté
+- **Conversion d'un modèle Simulink existant** : bouton *Convertir un modèle Simulink…* sous « Importer un projet (.rls) ». Fenêtre en quatre étapes (analyse du modèle, actions, observations et variables initiales, pas et récompense) qui crée un nouveau projet avec une **copie convertie** du modèle (entrées → constantes pilotables, sorties → bloc source, affichages retirés, variables du workspace embarquées, solveur à pas fixe au choix) puis la teste à vide. L'original n'est jamais modifié. Commandes worker `analyze-model` et `convert-model`, scripts `matlab/rlstudio_analyze.m` et `rlstudio_convert.m`, explorateur de blocs partagé (`gui/explorer.py`).
+- **Entraînement** : journal détaillé et horodaté dans une colonne à droite des graphiques (démarrage de MATLAB/Simulink, évaluation de référence épisode par épisode avec temps restant, début de l'apprentissage, une ligne par épisode avec vitesse en pas/s et temps restant) ; la barre de progression suit l'évaluation de référence avant l'apprentissage.
+
 ### Corrigé
+- **Bouton Arrêter** : il répond immédiatement. Le process de calcul est tué avec ses process fils (moteur MATLAB compris) au lieu d'attendre la fin de l'épisode ou 20 s ; seul l'apprentissage en cours garde un arrêt propre (3 s maximum) pour enregistrer le modèle partiel. Un run interrompu avant l'enregistrement du modèle est supprimé, et l'arrêt ne s'affiche plus comme une erreur.
 - Graphiques temporels (Entraînement, Évaluation) : la légende des signaux n'est plus dessinée sur la courbe mais sous le graphique, en couleurs lisibles.
+- Graphiques temporels avec beaucoup de signaux : une couleur distincte par signal (plus de couleurs répétées en pointillé), légende compacte à hauteur plafonnée, dont les entrées sont cliquables pour masquer / afficher une courbe (et un raccourci « tout masquer / afficher »).
 
 ## [0.3.1] - 2026-10-17
 
