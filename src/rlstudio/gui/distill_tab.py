@@ -1,12 +1,12 @@
 """Onglet « Modele mathematique » : extraire d'un run une loi de commande lisible (PID, table, arbre, equation)."""
-import json
 import os
 import sys
+import time
 from pathlib import Path
 
 import numpy as np
 import pyqtgraph as pg
-from PySide6.QtCore import QObject, Qt, Signal
+from PySide6.QtCore import QObject, QTimer, Qt, Signal
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QDoubleSpinBox, QFileDialog, QGridLayout, QHBoxLayout, QHeaderView, QLineEdit,
     QMessageBox, QPlainTextEdit, QProgressBar, QSpinBox, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
@@ -70,8 +70,21 @@ class DistillTab(QWidget):
         self.btn_stop.setEnabled(False)
         self.progress = QProgressBar()
         self.progress.setRange(0, 1000)
-        self.progress.setTextVisible(False)
+        self.progress.setTextVisible(True)
+        self.progress.setFormat("%p %")
         self.status = label("", "muted", wrap=True)
+        self.stage = label("", wrap=True)
+        self.timing = label("", "muted")
+        self.logbox = QPlainTextEdit()
+        self.logbox.setObjectName("mono")
+        self.logbox.setReadOnly(True)
+        self.logbox.setFixedHeight(120)
+        self.logbox.setPlaceholderText("Journal de l'extraction")
+        self.logbox.hide()
+        self._t0, self._fraction = None, 0.0
+        self.clock = QTimer(self)
+        self.clock.setInterval(1000)
+        self.clock.timeout.connect(self._tick)
         row = QHBoxLayout()
         row.addWidget(self.btn_start)
         row.addWidget(self.btn_stop)
@@ -87,6 +100,9 @@ class DistillTab(QWidget):
         cfg.body.addLayout(meth)
         cfg.body.addLayout(grid)
         cfg.body.addLayout(row)
+        cfg.body.addWidget(self.stage)
+        cfg.body.addWidget(self.timing)
+        cfg.body.addWidget(self.logbox)
         cfg.body.addWidget(self.status)
 
         # resultats
@@ -305,29 +321,56 @@ class DistillTab(QWidget):
         self.btn_stop.setEnabled(True)
         self.run_combo.setEnabled(False)
         self.progress.setValue(0)
-        self.status.setText("Demarrage ...")
+        self.status.setText("")
+        self.logbox.clear()
+        self.logbox.show()
+        self.stage.setText("Demarrage du processus de calcul (chargement de PyTorch, quelques secondes) ...")
+        self._t0, self._fraction = time.monotonic(), 0.0
+        self._tick()
+        self.clock.start()
         self.busy.emit(True)
 
     def _stop(self):
         if self.runner:
             self.runner.stop()
-            self.status.setText("Arret en cours ...")
+            self.stage.setText("Arret en cours (fin de l'episode simule) ...")
 
     def _on_log(self, text):
-        self.status.setText(text.strip()[:200])
+        self.logbox.appendPlainText(text.rstrip())
 
     def _on_progress(self, stage, fraction):
+        self._fraction = fraction
         self.progress.setValue(int(fraction * 1000))
-        self.status.setText(stage)
+        self.stage.setText(stage)
+
+    @staticmethod
+    def _fmt(seconds):
+        seconds = int(max(seconds, 0))
+        return f"{seconds // 60} min {seconds % 60:02d} s" if seconds >= 60 else f"{seconds} s"
+
+    def _tick(self):
+        if self._t0 is None:
+            return
+        elapsed = time.monotonic() - self._t0
+        text = f"Ecoule : {self._fmt(elapsed)}"
+        if self._fraction > 0.03:
+            text += f"   ·   reste environ {self._fmt(elapsed * (1 - self._fraction) / self._fraction)}"
+        self.timing.setText(text)
 
     def _on_finished(self, message):
         self.runner = None
+        self.clock.stop()
+        elapsed = time.monotonic() - self._t0 if self._t0 else 0
+        self._t0 = None
         self.btn_stop.setEnabled(False)
         self.run_combo.setEnabled(True)
         self.btn_start.setEnabled(self.run_combo.count() > 0)
         self.busy.emit(False)
+        self.stage.setText("")
+        self.timing.setText(f"Duree : {self._fmt(elapsed)}")
         if message.startswith("ERREUR"):
-            self.status.setText(message[:600])
+            self.logbox.appendPlainText(message)
+            self.status.setText("Echec de l'extraction : voir le journal ci-dessus.")
         else:
             self.status.setText("Extraction terminee." if message.startswith("Termine") else "Extraction arretee.")
             self.progress.setValue(1000 if message.startswith("Termine") else self.progress.value())

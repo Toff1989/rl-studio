@@ -30,7 +30,10 @@ def test_worker_distill_emits_progress_and_report(trained):
                         "--options", json.dumps(opts)], capture_output=True, text=True, timeout=300, encoding="utf-8")
     events = [json.loads(ln) for ln in r.stdout.splitlines() if ln.startswith("{")]
     assert r.returncode == 0, r.stderr
-    assert any(e["type"] == "progress" for e in events)
+    prog = [e for e in events if e["type"] == "progress"]
+    assert len(prog) > 10, "un evenement par episode simule"
+    fr = [e["fraction"] for e in prog]
+    assert fr == sorted(fr) and fr[-1] <= 1.0 and any("episode" in e["stage"] for e in prog)
     done = events[-1]
     assert done["type"] == "done" and not done["stopped"] and done["recommended"]
     assert (run_dir / "distill" / "report.json").exists()

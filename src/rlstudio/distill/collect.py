@@ -57,13 +57,15 @@ def rollout(env, behave, seed, reset=None, max_steps=None):
     return {"obs": np.array(seen), "acts": np.array(acts), "return": total, "length": steps, "terminated": bool(terminated)}
 
 
-def evaluate(env, act_fn, n_episodes, seed0, reset=None, expert=None, should_stop=None, max_steps=None):
+def evaluate(env, act_fn, n_episodes, seed0, reset=None, expert=None, should_stop=None, max_steps=None, on_episode=None):
     """Retour moyen, episodes menes a terme (sans arret anticipe), et fidelite sur les etats effectivement visites."""
     runs = []
     for k in range(n_episodes):
         if should_stop and should_stop():
             raise Stopped()
         runs.append(rollout(env, act_fn, seed0 + k, reset=reset, max_steps=max_steps))
+        if on_episode:
+            on_episode(k + 1, n_episodes)
     rets = np.array([r["return"] for r in runs])
     out = {"return_mean": float(rets.mean()), "return_std": float(rets.std()),
            "length_mean": float(np.mean([r["length"] for r in runs])),
@@ -76,7 +78,7 @@ def evaluate(env, act_fn, n_episodes, seed0, reset=None, expert=None, should_sto
     return out
 
 
-def collect_expert(env, expert, n_episodes, noise, seed0, rng, should_stop=None, max_steps=None):
+def collect_expert(env, expert, n_episodes, noise, seed0, rng, should_stop=None, max_steps=None, on_episode=None):
     """Rejoue l'expert avec un bruit d'action (pour visiter des etats voisins) ; etiquette chaque etat par l'expert."""
     data = Dataset(expert.obs_names, expert.act_names, expert.low, expert.high)
     half = (expert.high - expert.low) / 2.0
@@ -89,10 +91,12 @@ def collect_expert(env, expert, n_episodes, noise, seed0, rng, should_stop=None,
             raise Stopped()
         r = rollout(env, behave, seed0 + k, max_steps=max_steps)
         data.add(r["obs"], expert.act_batch(r["obs"]))
+        if on_episode:
+            on_episode(k + 1, n_episodes)
     return data
 
 
-def dagger_round(env, expert, surrogate, data, n_episodes, beta, seed0, rng, should_stop=None, max_steps=None):
+def dagger_round(env, expert, surrogate, data, n_episodes, beta, seed0, rng, should_stop=None, max_steps=None, on_episode=None):
     """Un tour de DAgger : on joue (en partie) avec le modele simple, l'expert etiquette les etats qu'il visite."""
     for k in range(n_episodes):
         if should_stop and should_stop():
@@ -103,15 +107,18 @@ def dagger_round(env, expert, surrogate, data, n_episodes, beta, seed0, rng, sho
 
         r = rollout(env, behave, seed0 + k, reset=surrogate.reset, max_steps=max_steps)
         data.add(r["obs"], expert.act_batch(r["obs"]))
+        if on_episode:
+            on_episode(k + 1, n_episodes)
 
 
-def run_dagger(env, expert, fit, data, iterations, episodes, seed0, rng, should_stop=None, tick=None, max_steps=None):
+def run_dagger(env, expert, fit, data, iterations, episodes, seed0, rng, should_stop=None, tick=None, max_steps=None, on_episode=None):
     """DAgger : ajuste, joue, reetiquette, agrege, rajuste. Renvoie (jeu de donnees agrege, dernier modele)."""
     data = data.copy()
     surrogate = fit(data)
     for it in range(1, iterations + 1):
         dagger_round(env, expert, surrogate, data, episodes, beta=0.5 ** it, seed0=seed0 + 1000 * it, rng=rng,
-                     should_stop=should_stop, max_steps=max_steps)
+                     should_stop=should_stop, max_steps=max_steps,
+                     on_episode=(lambda k, n, it=it: on_episode(it, k, n)) if on_episode else None)
         surrogate = fit(data)
         if tick:
             tick()

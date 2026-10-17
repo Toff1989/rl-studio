@@ -80,29 +80,36 @@ def _run(project, run_dir, opts, env, log, progress, should_stop):
 
     families = [m for m in opts.methods]
     n_final = {"linear": 1, "table": 1, "tree": len(opts.tree_depths), "symbolic": len(opts.symbolic_terms), "neural": 1}
-    total = 3 + sum((0 if f == "neural" else opts.dagger_iters + 1) + n_final[f] for f in families)
+    n_rand = min(opts.eval_episodes, 5)
+    # unite de travail = un episode simule (c'est ce qui prend du temps) ; les ajustements sont quasi instantanes
+    total = n_rand + opts.eval_episodes + opts.episodes + sum(
+        (0 if f == "neural" else opts.dagger_iters * opts.dagger_episodes) + n_final[f] * opts.eval_episodes for f in families)
     done = [0]
+    total = max(total, 1)
 
-    def tick(stage):
+    def bump(stage):
         done[0] += 1
-        progress(stage, min(1.0, done[0] / total))
+        progress(stage, min(0.999, done[0] / total))
+
+    def stage_cb(text):
+        return lambda k, n: bump(f"{text} : episode {k}/{n}")
 
     eval_seed0 = 10_000 + opts.seed
     t0 = time.time()
     # -- references : politique aleatoire et politique apprise ----------------------------------
     log("Evaluation de la politique aleatoire (reference basse) ...")
-    random_res = collect.evaluate(env, lambda o: env.action_space.sample(), min(opts.eval_episodes, 5), 20_000 + opts.seed, should_stop=should_stop, max_steps=opts.max_steps)
-    tick("Reference aleatoire")
+    random_res = collect.evaluate(env, lambda o: env.action_space.sample(), n_rand, 20_000 + opts.seed, should_stop=should_stop, max_steps=opts.max_steps,
+                                  on_episode=stage_cb("Reference aleatoire"))
     log("Evaluation de la politique apprise ...")
-    exp_res = collect.evaluate(env, expert.act, opts.eval_episodes, eval_seed0, expert=expert, should_stop=should_stop, max_steps=opts.max_steps)
-    tick("Politique apprise")
+    exp_res = collect.evaluate(env, expert.act, opts.eval_episodes, eval_seed0, expert=expert, should_stop=should_stop, max_steps=opts.max_steps,
+                           on_episode=stage_cb("Evaluation de la politique apprise"))
     held_obs, held_labels = exp_res["obs_episodes"], exp_res["expert_labels"]
     rand_ret, exp_ret = random_res["return_mean"], exp_res["return_mean"]
     log(f"  retour : aleatoire {rand_ret:.3f}  |  politique apprise {exp_ret:.3f} +/- {exp_res['return_std']:.3f}")
 
     log(f"Collecte de {opts.episodes} episodes de la politique apprise (bruit d'action {opts.noise:.0%}) ...")
-    base = collect.collect_expert(env, expert, opts.episodes, opts.noise, seed0=0 + opts.seed, rng=rng, should_stop=should_stop, max_steps=opts.max_steps)
-    tick("Collecte")
+    base = collect.collect_expert(env, expert, opts.episodes, opts.noise, seed0=0 + opts.seed, rng=rng, should_stop=should_stop, max_steps=opts.max_steps,
+                                 on_episode=stage_cb("Collecte de donnees"))
     log(f"  {len(base)} paires (etat -> action)")
 
     dt = opts.integral_dt or float(getattr(env, "step_s", 1.0) or 1.0)
@@ -128,7 +135,8 @@ def _run(project, run_dir, opts, env, log, progress, should_stop):
     candidates = []
 
     def score(cand_id, family, sur: Surrogate):
-        res = collect.evaluate(env, sur.act, opts.eval_episodes, eval_seed0, reset=sur.reset, expert=expert, should_stop=should_stop, max_steps=opts.max_steps)
+        res = collect.evaluate(env, sur.act, opts.eval_episodes, eval_seed0, reset=sur.reset, expert=expert, should_stop=should_stop, max_steps=opts.max_steps,
+                           on_episode=stage_cb(f"Evaluation en boucle fermee de {cand_id}"))
         pred = sur.predict_episodes(held_obs)
         r2_exp = r_squared(held_labels, pred)
         pairs = np.column_stack([held_labels[:, 0], pred[:, 0]])
@@ -144,24 +152,24 @@ def _run(project, run_dir, opts, env, log, progress, should_stop):
         entry["files"] = export.write_candidate(export.distill_dir(run_dir) / cand_id, sur)
         candidates.append(entry)
         log(f"  {cand_id:14s} complexite {entry['complexity']:6d}  R2 {r2_exp:6.3f}  retour {entry['return_mean']:9.3f}  score {entry['score']:6.3f}")
-        tick(f"Evaluation {cand_id}")
 
     for family in families:
         if should_stop and should_stop():
             raise collect.Stopped()
         log(f"== {METHOD_LABELS[family]}")
         if family == "neural":
+            log("  extraction du reseau ...")
             score("neural", family, expert.neural())
             continue
         data = base
         if opts.dagger_iters > 0:
             log(f"  DAgger : {opts.dagger_iters} tour(s) de {opts.dagger_episodes} episode(s)")
             data, _ = collect.run_dagger(env, expert, fit_for_dagger[family], base, opts.dagger_iters, opts.dagger_episodes,
-                                         seed0=500 + opts.seed, rng=rng, should_stop=should_stop, tick=lambda f=family: tick(f"DAgger {f}"),
-                                         max_steps=opts.max_steps)
-            tick(f"DAgger {family}")
-        else:
-            tick(f"Ajustement {family}")
+                                         seed0=500 + opts.seed, rng=rng, should_stop=should_stop,
+                                         tick=lambda f=family: log(f"  tour de DAgger termine, modele {METHOD_LABELS[f]} reajuste"),
+                                         max_steps=opts.max_steps,
+                                         on_episode=lambda it, k, n, f=family: bump(f"DAgger {METHOD_LABELS[f]} : tour {it}/{opts.dagger_iters}, episode {k}/{n}"))
+        log("  ajustement final des modeles ...")
         for cand_id, sur in finals[family](data):
             score(cand_id, family, sur)
 
