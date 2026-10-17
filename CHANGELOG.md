@@ -6,6 +6,13 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+### Ajouté
+- **Onglet Évaluation** : rejoue un run entraîné (ou un modèle mathématique extrait) avec la politique déterministe et
+  trace en direct les observations, les actions, la récompense cumulée et le retour par épisode ; choix du run, de la
+  politique, du nombre d'épisodes, de la graine et de la vitesse. Commande worker `evaluate`.
+- **Entraînement** : les observations et les actions sont désormais tracées en **courbes temporelles** (une courbe par
+  signal, légende avec les noms), avec option de normalisation pour comparer des signaux d'échelles différentes.
+
 ## [0.3.0] - 2026-10-17
 
 Extraire l'intelligence d'un agent entraîné sous forme de modèle mathématique lisible.

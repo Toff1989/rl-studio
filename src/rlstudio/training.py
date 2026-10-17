@@ -54,7 +54,7 @@ def _callback(on_episode, on_state, should_stop, state_every):
 
 
 def train(project: Project, on_episode=None, on_state=None, on_baseline=None, should_stop=None,
-          log=print, state_every=3):
+          log=print, state_every=3, on_meta=None):
     from stable_baselines3 import PPO, SAC, TD3
     from stable_baselines3.common.monitor import Monitor
 
@@ -83,6 +83,9 @@ def train(project: Project, on_episode=None, on_state=None, on_baseline=None, sh
             "MlpPolicy", Monitor(env), seed=int(algo["seed"]), device=algo["device"], verbose=0,
             **(algo.get("kwargs") or {}),
         )
+        if on_meta:
+            on_meta({"obs_names": list(getattr(env, "obs_names", None) or []),
+                     "action_names": list(getattr(env, "action_names", None) or [])})
         t0 = time.time()
         model.learn(int(algo["total_timesteps"]), callback=_callback(on_episode, on_state, should_stop, state_every))
         model.save(run_dir / "model")

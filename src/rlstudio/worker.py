@@ -7,6 +7,7 @@ Protocole : une ligne JSON par evenement sur stdout ; la commande `stop` arrive 
   inspect      --model FILE                      blocs d'un modele Simulink
   matlab-test                                    demarre MATLAB et verifie Simulink
   env-info                                       versions installees (Python, PyTorch, CUDA...)
+  evaluate     --project DIR --run NOM [--policy agent|distill:ID]   rejoue des episodes en direct
   distill      --project DIR --run NOM [--options JSON]   extrait un modele mathematique d'un run
   export-simulink --project DIR --run NOM --candidate ID --out FILE   controleur extrait -> modele Simulink
 """
@@ -76,6 +77,7 @@ def cmd_train(args):
         on_episode=lambda n, r, length, steps: emit(type="episode", n=n, reward=r, length=length, steps=steps),
         on_state=on_state,
         on_baseline=lambda mean, label: emit(type="baseline", mean=mean, label=label),
+        on_meta=lambda m: emit(type="meta", **m),
         should_stop=stop.is_set,
         log=lambda m: emit(type="log", text=m),
     )
@@ -116,6 +118,32 @@ def cmd_export_simulink(args):
     run_dir = _run_dir(project, args.run)
     out = build_simulink_controller(load_candidate(run_dir, args.candidate), args.out, log=lambda m: emit(type="log", text=m))
     emit(type="result", path=str(out))
+
+
+def cmd_evaluate(args):
+    import numpy as np
+
+    from .evaluation import run_evaluation
+    from .project import Project
+
+    project = Project(args.project)
+    stop = threading.Event()
+    threading.Thread(target=_listen_for_stop, args=(stop,), daemon=True).start()
+    last = [0.0]
+
+    def on_step(s):
+        now = time.monotonic()
+        if args.delay <= 0 and now - last[0] < 0.03:  # sans ralentissement : ~30 mises a jour par seconde
+            return
+        last[0] = now
+        emit(type="step", episode=s["episode"], step=s["step"], obs=np.asarray(s["obs"]).round(5).tolist(),
+             action=np.asarray(s["action"]).round(5).tolist(), reward=round(s["reward"], 5), total=round(s["total"], 5))
+
+    summary = run_evaluation(project, _run_dir(project, args.run), args.policy, args.episodes, args.seed, args.delay,
+                             on_meta=lambda m: emit(type="meta", **m), on_step=on_step,
+                             on_episode=lambda e: emit(type="episode", **e), should_stop=stop.is_set,
+                             log=lambda m: emit(type="log", text=m))
+    emit(type="done", stopped=stop.is_set(), **summary)
 
 
 def cmd_inspect(args):
@@ -185,6 +213,13 @@ def main(argv=None):
     p.add_argument("--project", required=True)
     p.add_argument("--run", required=True)
     p.add_argument("--options")
+    p = sub.add_parser("evaluate")
+    p.add_argument("--project", required=True)
+    p.add_argument("--run", required=True)
+    p.add_argument("--policy", default="agent")
+    p.add_argument("--episodes", type=int, default=5)
+    p.add_argument("--seed", type=int, default=1000)
+    p.add_argument("--delay", type=float, default=0.0, help="pause par pas (s), pour suivre l'episode a l'oeil")
     p = sub.add_parser("export-simulink")
     p.add_argument("--project", required=True)
     p.add_argument("--run", required=True)
@@ -192,7 +227,7 @@ def main(argv=None):
     p.add_argument("--out", required=True)
     args = ap.parse_args(argv)
     handlers = {"train": cmd_train, "inspect": cmd_inspect, "matlab-test": cmd_matlab_test, "env-info": cmd_env_info,
-                "distill": cmd_distill, "export-simulink": cmd_export_simulink}
+                "distill": cmd_distill, "evaluate": cmd_evaluate, "export-simulink": cmd_export_simulink}
     try:
         handlers[args.cmd](args)
     except Exception as e:

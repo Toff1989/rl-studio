@@ -43,6 +43,7 @@ class TrainRunner(QObject):
     episode = Signal(int, float, int, int)
     state = Signal(object)
     baseline = Signal(float, str)
+    meta = Signal(list, list)  # noms des observations, noms des actions
     log = Signal(str)
     finished = Signal(str)  # "Termine..." ou "ERREUR..."
 
@@ -95,6 +96,8 @@ class TrainRunner(QObject):
             self.episode.emit(ev["n"], ev["reward"], ev["length"], ev["steps"])
         elif kind == "baseline":
             self.baseline.emit(ev["mean"], ev["label"])
+        elif kind == "meta":
+            self.meta.emit(list(ev.get("obs_names") or []), list(ev.get("action_names") or []))
         elif kind == "log":
             self.log.emit(ev["text"])
         elif kind == "done":
@@ -112,6 +115,44 @@ class TrainRunner(QObject):
         if self._reader.buf.strip():
             self._handle(self._reader.buf)
         self.finished.emit(self._final or f"ERREUR : le processus de calcul s'est arrete (code {code}).")
+
+
+class EvalRunner(TrainRunner):
+    """Evaluation en direct (commande `evaluate` du worker) : signaux `step` et `episode`."""
+
+    step = Signal(object)
+    episode_done = Signal(object)
+
+    def __init__(self, project, settings: Settings, run_name: str, policy: str, episodes: int, seed: int, delay: float, parent=None):
+        super().__init__(project, settings, parent)
+        self.args = ["evaluate", "--project", str(project.path), "--run", run_name, "--policy", policy,
+                     "--episodes", str(episodes), "--seed", str(seed), "--delay", str(delay)]
+
+    def start(self):
+        self.proc = _worker_process(self.settings, self.args, self)
+        self.proc.readyReadStandardOutput.connect(self._on_output)
+        self.proc.finished.connect(self._on_finished)
+        self.proc.errorOccurred.connect(self._on_error)
+        self.proc.start()
+
+    def _handle(self, line: str):
+        if line.startswith("{"):
+            try:
+                ev = json.loads(line)
+            except ValueError:
+                ev = {}
+            kind = ev.get("type")
+            if kind == "step":
+                self.step.emit({"episode": ev["episode"], "step": ev["step"], "obs": np.asarray(ev["obs"]),
+                                "action": np.asarray(ev["action"]), "reward": ev["reward"], "total": ev["total"]})
+                return
+            if kind == "episode":
+                self.episode_done.emit(ev)
+                return
+            if kind == "done":
+                self._final = "Arrete." if ev.get("stopped") else "Termine."
+                return
+        super()._handle(line)
 
 
 class DistillRunner(TrainRunner):

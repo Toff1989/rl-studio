@@ -13,7 +13,7 @@ import yaml
 from PySide6.QtGui import QColor, QIcon
 from PySide6.QtCore import QSize, QTimer, Qt, QThread, Signal, Slot, QObject
 from PySide6.QtWidgets import (
-    QApplication, QColorDialog, QComboBox, QDialog, QDoubleSpinBox, QFileDialog, QFormLayout, QFrame, QGridLayout,
+    QApplication, QCheckBox, QColorDialog, QComboBox, QDialog, QDoubleSpinBox, QFileDialog, QFormLayout, QFrame, QGridLayout,
     QHBoxLayout, QHeaderView, QInputDialog, QLabel, QLineEdit, QListWidget, QListWidgetItem,
     QMainWindow, QMenu, QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QScrollArea, QSpinBox,
     QSplitter, QTableWidget, QTableWidgetItem, QTabWidget, QTreeWidget, QTreeWidgetItem, QVBoxLayout,
@@ -29,6 +29,8 @@ from . import theme
 from .theme import C
 from .. import runtime
 from .distill_tab import DistillTab
+from .eval_tab import EvalTab
+from .live_plots import SeriesPlot
 from .runner import RuntimeMissing, TrainRunner, WorkerJob
 from .settings_dialog import SettingsDialog
 from .widgets import Card, Kpi, button, column, fmt_run_date, label, scroll_page
@@ -342,6 +344,9 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self._tab_runs(), "Resultats")
         self.distill = DistillTab(self.settings)
         self.distill.busy.connect(lambda b: self.plist.setEnabled(not b))
+        self.evaltab = EvalTab(self.settings)
+        self.evaltab.busy.connect(lambda b: self.plist.setEnabled(not b))
+        self.tabs.insertTab(4, self.evaltab, "Evaluation")
         self.tabs.addTab(self.distill, "Modele mathematique")
         ml.addWidget(self.tabs, 1)
 
@@ -594,14 +599,12 @@ class MainWindow(QMainWindow):
         self.c_reward.setSymbolBrush(C["accent"])
         self.c_smooth.setPen(pg.mkPen(C["warning"], width=3))
         self.base_line.setPen(pg.mkPen(C["danger"], width=1.5, style=Qt.DashLine))
-        self.c_obs.setPen(pg.mkPen(C["magenta"], width=2))
-        self.c_obs.setSymbolBrush(C["magenta"])
         self.c_rew_step.setPen(pg.mkPen(C["success"], width=2))
         if hasattr(self, "distill"):
             self.distill.restyle()
-        colors = self._series_colors()
-        for i, curve in enumerate(self.act_curves):
-            curve.setPen(pg.mkPen(colors[i % len(colors)], width=2))
+            self.evaltab.restyle()
+        self.p_obs.restyle()
+        self.p_act.restyle()
 
     def _tab_train(self):
         self.btn_start = button("▶  Demarrer", "primary", self._start)
@@ -633,13 +636,14 @@ class MainWindow(QMainWindow):
         self.base_line = pg.InfiniteLine(angle=0, pen=pg.mkPen(C["danger"], width=1.5, style=Qt.DashLine))
         self.p_reward.addItem(self.base_line)
         self.base_line.hide()
-        self.p_obs = self._plot("Observation courante (par indice)")
-        self.c_obs = self.p_obs.plot(pen=pg.mkPen(C["magenta"], width=2), symbol="o", symbolSize=7,
-                                     symbolBrush=C["magenta"], symbolPen=None)
-        self.p_act = self._plot("Actions de l'episode en cours")
+        self.p_obs = SeriesPlot("Observations (episode en cours)")
+        self.p_act = SeriesPlot("Actions (episode en cours)")
+        self.p_obs.setMinimumHeight(260)
+        self.p_act.setMinimumHeight(260)
+        self.chk_norm = QCheckBox("Normaliser les courbes (comparer des signaux d'echelles differentes)")
+        self.chk_norm.toggled.connect(lambda f: (self.p_obs.set_normalized(f), self.p_act.set_normalized(f)))
         self.p_rew_step = self._plot("Recompense par pas (episode en cours)")
         self.c_rew_step = self.p_rew_step.plot(pen=pg.mkPen(C["success"], width=2))
-        self.act_curves = []
         self._style_plots()
         grid = QGridLayout()
         grid.setSpacing(12)
@@ -660,6 +664,7 @@ class MainWindow(QMainWindow):
         lay.setSpacing(14)
         lay.addLayout(bar)
         lay.addLayout(kpis)
+        lay.addWidget(self.chk_norm)
         lay.addLayout(grid, 1)
         lay.addWidget(self.logbox)
         self._reset_train_state()
@@ -948,6 +953,7 @@ class MainWindow(QMainWindow):
         self.a_kwargs.setPlainText(yaml.safe_dump(a.get("kwargs") or {}, sort_keys=False) if a.get("kwargs") else "")
         self._refresh_runs()
         self.distill.set_project(project)
+        self.evaltab.set_project(project)
         self._reset_train_state()
         self._update_dashboard()
         self._set_dirty(False)
@@ -1071,10 +1077,9 @@ class MainWindow(QMainWindow):
         self._reset_trace()
 
     def _reset_trace(self):
-        self.tr_act, self.tr_rew = [], []
-        for c in getattr(self, "act_curves", []):
-            self.p_act.removeItem(c)
-        self.act_curves = []
+        self.tr_rew, self._ep_start = [], None
+        self.p_obs.reset()
+        self.p_act.reset()
         self.c_rew_step.setData([], [])
 
     def _log(self, text):
@@ -1096,6 +1101,7 @@ class MainWindow(QMainWindow):
         self.worker.episode.connect(self._on_episode)
         self.worker.state.connect(self._on_state)
         self.worker.baseline.connect(self._on_baseline)
+        self.worker.meta.connect(self._on_meta)
         self.worker.log.connect(self._log)
         self.worker.finished.connect(self._on_finished)
         try:
@@ -1113,6 +1119,10 @@ class MainWindow(QMainWindow):
         if self.worker:
             self.worker.stop()
             self.status.setText("Arret demande...")
+
+    def _on_meta(self, obs_names, act_names):
+        self.p_obs.set_names(obs_names)
+        self.p_act.set_names(act_names)
 
     def _on_baseline(self, mean, lbl):
         self.base_line.setValue(mean)
@@ -1136,17 +1146,12 @@ class MainWindow(QMainWindow):
     def _on_state(self, s):
         self.m_steps.set(f"{s['timesteps']:,}".replace(",", " "))
         self.progress.setValue(min(s["timesteps"], self._total_steps))
-        self.c_obs.setData(np.arange(len(s["obs"])), s["obs"])
-        action = np.atleast_1d(s["action"])
-        self.tr_act.append(action)
+        if self._ep_start is None:
+            self._ep_start = s["timesteps"]
+        t = s["timesteps"] - self._ep_start
+        self.p_obs.append(t, s["obs"])
+        self.p_act.append(t, np.atleast_1d(s["action"]))
         self.tr_rew.append(s["reward"])
-        arr = np.array(self.tr_act)
-        palette = self._series_colors()
-        while len(self.act_curves) < arr.shape[1]:
-            i = len(self.act_curves)
-            self.act_curves.append(self.p_act.plot(pen=pg.mkPen(palette[i % len(palette)], width=2)))
-        for i, c in enumerate(self.act_curves):
-            c.setData(arr[:, i])
         self.c_rew_step.setData(self.tr_rew)
 
     def _on_finished(self, message):
@@ -1159,6 +1164,7 @@ class MainWindow(QMainWindow):
         self.plist.setEnabled(True)
         self._refresh_runs()
         self.distill.set_project(self.project)
+        self.evaltab.set_project(self.project)
         self._update_dashboard()
 
     # -- resultats ----------------------------------------------------------------------
