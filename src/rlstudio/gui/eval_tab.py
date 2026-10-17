@@ -169,7 +169,7 @@ class EvalTab(QWidget):
     def _stop(self):
         if self.runner:
             self.runner.stop()
-            self.status.setText("Arret demande ...")
+            self.status.setText("Arret...")
 
     def _on_meta(self, obs_names, act_names):
         self.p_obs.set_names(obs_names)

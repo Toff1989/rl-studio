@@ -1,5 +1,9 @@
 """Lancement des processus de calcul depuis l'interface (QProcess) : entrainement, explorateur, outils."""
 import json
+import shutil
+import subprocess
+import sys
+from pathlib import Path
 
 import numpy as np
 from PySide6.QtCore import QObject, QProcess, QProcessEnvironment, QTimer, Signal
@@ -45,7 +49,10 @@ class TrainRunner(QObject):
     baseline = Signal(float, str)
     meta = Signal(list, list)  # noms des observations, noms des actions
     log = Signal(str)
+    progress = Signal(str, float)  # phase ("baseline"), avancement 0..1
     finished = Signal(str)  # "Termine..." ou "ERREUR..."
+
+    GRACE_MS = 3000  # delai laisse a un arret propre quand il apporte quelque chose (modele partiel enregistre)
 
     def __init__(self, project, settings: Settings, parent=None):
         super().__init__(parent)
@@ -53,6 +60,9 @@ class TrainRunner(QObject):
         self.proc = None
         self._reader = _LineReader()
         self._final = None
+        self._stopping = self._killed = False
+        self._graceful = False  # arret propre utile ? (seul l'apprentissage en cours enregistre un modele partiel)
+        self.run_dir = None
 
     def start(self):
         self.proc = _worker_process(self.settings, ["train", "--project", str(self.project.path),
@@ -63,15 +73,34 @@ class TrainRunner(QObject):
         self.proc.start()
 
     def _on_error(self, error):
+        if self._killed:  # « Crashed » est le signal normal d'un process que nous venons de tuer
+            return
         self._fail(f"Impossible de lancer le processus de calcul ({error}).")
 
     def stop(self):
-        if self.proc and self.proc.state() != QProcess.NotRunning:
+        """Arret immediat : le process est tue sur-le-champ (avec MATLAB, qu'il a lance), sauf pendant l'apprentissage,
+        ou l'on laisse quelques secondes au modele partiel pour s'enregistrer."""
+        if not self.proc or self.proc.state() == QProcess.NotRunning:
+            return
+        self._stopping = True
+        if self._graceful:
             self.proc.write(b"stop\n")
-            QTimer.singleShot(20000, self._kill)  # arret force si le worker ne repond pas
+            QTimer.singleShot(self.GRACE_MS, self._kill)
+        else:
+            self._kill()
 
     def _kill(self):
         if self.proc and self.proc.state() != QProcess.NotRunning:
+            self._killed = True
+            pid = self.proc.processId()
+            if sys.platform == "win32" and pid:
+                # tue l'arbre entier (le python du venv est un lanceur, MATLAB un process fils) : taskkill doit finir
+                # avant de tuer le pere, sinon les fils deviennent orphelins et ne sont plus retrouves
+                try:
+                    subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)], stdout=subprocess.DEVNULL,
+                                   stderr=subprocess.DEVNULL, creationflags=0x08000000, timeout=5)
+                except (OSError, subprocess.SubprocessError):
+                    pass
             self.proc.kill()
 
     def _on_output(self):
@@ -89,7 +118,10 @@ class TrainRunner(QObject):
             self.log.emit(line)
             return
         kind = ev.get("type")
-        if kind == "state":
+        if kind == "run":
+            self.run_dir = Path(ev["run_dir"])
+        elif kind == "state":
+            self._graceful = True  # l'apprentissage a commence : un arret propre enregistre le modele partiel
             self.state.emit({"timesteps": ev["timesteps"], "obs": np.asarray(ev["obs"]),
                              "action": np.asarray(ev["action"]), "reward": ev["reward"]})
         elif kind == "episode":
@@ -100,6 +132,8 @@ class TrainRunner(QObject):
             self.meta.emit(list(ev.get("obs_names") or []), list(ev.get("action_names") or []))
         elif kind == "log":
             self.log.emit(ev["text"])
+        elif kind == "progress":
+            self.progress.emit(ev.get("stage", ""), float(ev.get("fraction", 0)))
         elif kind == "done":
             self._final = ("Termine. Resultats : " + ev["run_dir"]) if not ev.get("stopped") else \
                           "Arrete. Resultats partiels : " + ev["run_dir"]
@@ -114,6 +148,11 @@ class TrainRunner(QObject):
         self._on_output()
         if self._reader.buf.strip():
             self._handle(self._reader.buf)
+        if self._killed and self.run_dir and not (self.run_dir / "model.zip").exists():
+            shutil.rmtree(self.run_dir, ignore_errors=True)  # run interrompu avant l'enregistrement : rien a garder
+            self.log.emit("Run interrompu avant l'enregistrement du modele : dossier supprime.")
+        if self._stopping and self._final is None:
+            self._final = "Arrete."
         self.finished.emit(self._final or f"ERREUR : le processus de calcul s'est arrete (code {code}).")
 
 

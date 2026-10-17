@@ -333,7 +333,7 @@ class DistillTab(QWidget):
     def _stop(self):
         if self.runner:
             self.runner.stop()
-            self.stage.setText("Arret en cours (fin de l'episode simule) ...")
+            self.stage.setText("Arret...")
 
     def _on_log(self, text):
         self.logbox.appendPlainText(text.rstrip())
