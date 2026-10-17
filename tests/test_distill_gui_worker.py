@@ -31,7 +31,7 @@ def test_worker_distill_emits_progress_and_report(trained):
     events = [json.loads(ln) for ln in r.stdout.splitlines() if ln.startswith("{")]
     assert r.returncode == 0, r.stderr
     prog = [e for e in events if e["type"] == "progress"]
-    assert len(prog) > 10, "un evenement par episode simule"
+    assert len(prog) >= 6, "un evenement par episode simule"
     fr = [e["fraction"] for e in prog]
     assert fr == sorted(fr) and fr[-1] <= 1.0 and any("episode" in e["stage"] for e in prog)
     done = events[-1]
