@@ -51,6 +51,15 @@ class MatlabSession:
         """Blocs du modele avec leurs sorties et parametres numeriques modifiables."""
         return json.loads(self.eng.rlstudio_inspect(str(model_path), nargout=1))
 
+    def analyze(self, model_path, init_path="") -> dict:
+        """Entrees, sorties, constantes, solveur, variables et blocs a retirer d'un modele (conversion)."""
+        return json.loads(self.eng.rlstudio_analyze(str(model_path), str(init_path or ""), nargout=1))
+
+    def convert(self, model_path, out_path, spec: dict, init_path="") -> dict:
+        """Enregistre une copie convertie du modele (voir matlab/rlstudio_convert.m) ; l'original n'est pas modifie."""
+        return json.loads(self.eng.rlstudio_convert(str(model_path), str(out_path), json.dumps(spec), str(init_path or ""),
+                                                    nargout=1))
+
     def close(self):
         try:
             self.eng.quit()

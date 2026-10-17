@@ -5,6 +5,7 @@ from pathlib import Path
 import shutil
 import sys
 import threading
+import time
 import traceback
 
 import numpy as np
@@ -24,12 +25,13 @@ from ..envs.spec import validate_spec
 from ..paths import ICON_FILE
 from ..project import Project, ProjectStore
 from ..settings import Settings
-from ..training import ALGOS
+from ..training import ALGOS, fmt_duration
 from . import theme
 from .theme import C
 from .. import runtime
 from .distill_tab import DistillTab
 from .eval_tab import EvalTab
+from .explorer import SimulinkExplorer
 from .live_plots import SeriesPlot
 from .runner import RuntimeMissing, TrainRunner, WorkerJob
 from .settings_dialog import SettingsDialog
@@ -107,85 +109,6 @@ class SpecTable(QTableWidget):
                     d[key] = txt  # la validation signalera la valeur invalide
             out.append(d)
         return out
-
-
-class SimulinkExplorer(QDialog):
-    """Arbre des blocs du modele : choisir les signaux observes et les parametres commandes."""
-
-    def __init__(self, parent, blocks):
-        super().__init__(parent)
-        self.setWindowTitle("Explorateur du modele Simulink")
-        self.resize(820, 600)
-        self.on_observation = self.on_action = None
-        self.blocks = [b for b in blocks if b.get("n_out") or b.get("params")]
-
-        self.filter = QLineEdit()
-        self.filter.setPlaceholderText("Filtrer par chemin ou type de bloc...")
-        self.filter.textChanged.connect(self._fill)
-        self.tree = QTreeWidget()
-        self.tree.setHeaderLabels(["Bloc / element", "Type / valeur"])
-        self.tree.setColumnWidth(0, 500)
-        self.tree.itemSelectionChanged.connect(self._update_buttons)
-        self.btn_obs = button("Ajouter comme observation", "primary", self._add_obs)
-        self.btn_act = button("Ajouter comme action", None, self._add_act)
-        row = QHBoxLayout()
-        row.addWidget(self.btn_obs)
-        row.addWidget(self.btn_act)
-        row.addStretch()
-        row.addWidget(button("Fermer", "ghost", self.accept))
-        lay = QVBoxLayout(self)
-        lay.setContentsMargins(20, 20, 20, 20)
-        lay.setSpacing(12)
-        lay.addWidget(label("Selectionne une sortie de bloc (signal) ou un parametre numerique de bloc.", "hint"))
-        lay.addWidget(self.filter)
-        lay.addWidget(self.tree, 1)
-        lay.addLayout(row)
-        self._fill()
-        self._update_buttons()
-
-    def _fill(self):
-        needle = self.filter.text().lower()
-        self.tree.clear()
-        for b in self.blocks:
-            if needle and needle not in b["path"].lower() and needle not in b["type"].lower():
-                continue
-            top = QTreeWidgetItem([b["path"].replace("\n", " "), b["type"]])
-            for k in range(1, int(b.get("n_out", 0)) + 1):
-                it = QTreeWidgetItem([f"Signal : sortie {k}", "signal"])
-                it.setData(0, Qt.UserRole, ("signal", b["path"], k))
-                top.addChild(it)
-            for p in b.get("params", []):
-                it = QTreeWidgetItem([f"Parametre : {p['name']}", str(p["value"])])
-                it.setData(0, Qt.UserRole, ("param", b["path"], p["name"], p["value"]))
-                top.addChild(it)
-            self.tree.addTopLevelItem(top)
-        if needle:
-            self.tree.expandAll()
-
-    def _current(self):
-        items = self.tree.selectedItems()
-        return items[0].data(0, Qt.UserRole) if items else None
-
-    def _update_buttons(self):
-        cur = self._current()
-        self.btn_obs.setEnabled(bool(cur and cur[0] == "signal"))
-        self.btn_act.setEnabled(bool(cur and cur[0] == "param"))
-
-    @staticmethod
-    def _short(path):
-        return path.split("/")[-1].replace(" ", "_").replace("\n", "_")
-
-    def _add_obs(self):
-        _, path, port = self._current()
-        if self.on_observation:
-            self.on_observation({"name": self._short(path), "block": path, "port": port, "size": 1})
-
-    def _add_act(self):
-        _, path, param, value = self._current()
-        if self.on_action:
-            v = float(value)
-            self.on_action({"name": self._short(path), "block": path, "param": param,
-                            "low": min(0.0, v), "high": max(1.0, v * 2)})
 
 
 # -- fenetre principale ------------------------------------------------------------------
@@ -282,6 +205,10 @@ class MainWindow(QMainWindow):
         improw.setContentsMargins(16, 0, 16, 0)
         improw.addWidget(button("Importer un projet (.rls)...", "ghost", self._import_dialog))
         sl.addLayout(improw)
+        convrow = QHBoxLayout()
+        convrow.setContentsMargins(16, 0, 16, 0)
+        convrow.addWidget(button("Convertir un modele Simulink...", "ghost", self._convert_dialog))
+        sl.addLayout(convrow)
         lab = label("PROJETS", "sectionLabel")
         lab.setContentsMargins(20, 8, 0, 0)
         sl.addWidget(lab)
@@ -655,8 +582,12 @@ class MainWindow(QMainWindow):
         self.logbox = QPlainTextEdit()
         self.logbox.setObjectName("mono")
         self.logbox.setReadOnly(True)
-        self.logbox.setFixedHeight(96)
-        self.logbox.setPlaceholderText("Journal d'entrainement")
+        self.logbox.setLineWrapMode(QPlainTextEdit.WidgetWidth)
+        self.logbox.setPlaceholderText("Le journal de l'entrainement s'affiche ici : demarrage de MATLAB, "
+                                       "evaluation de reference, episodes, vitesse et temps restant.")
+        side = Card("Journal")
+        side.setFixedWidth(380)
+        side.body.addWidget(self.logbox, 1)
 
         page = QWidget()
         lay = QVBoxLayout(page)
@@ -665,8 +596,11 @@ class MainWindow(QMainWindow):
         lay.addLayout(bar)
         lay.addLayout(kpis)
         lay.addWidget(self.chk_norm)
-        lay.addLayout(grid, 1)
-        lay.addWidget(self.logbox)
+        main = QHBoxLayout()
+        main.setSpacing(12)
+        main.addLayout(grid, 1)
+        main.addWidget(side)
+        lay.addLayout(main, 1)
         self._reset_train_state()
         return page
 
@@ -810,6 +744,22 @@ class MainWindow(QMainWindow):
             self.project = None
             self._set_dirty(False)
             self._refresh_list()
+
+    # -- conversion d'un modele Simulink existant ---------------------------------------
+    def _convert_dialog(self):
+        from .convert_dialog import ConvertDialog
+
+        if self.dirty and not self._ask_save():
+            return
+        if self.worker or any(getattr(t, "runner", None) for t in (self.distill, self.evaltab)):
+            QMessageBox.information(self, "Convertir un modele", "Attends la fin du calcul en cours avant de convertir un modele.")
+            return
+        dlg = ConvertDialog(self, self.settings, self.store)
+        dlg.exec()
+        if dlg.created_slug:
+            self._set_dirty(False)
+            self._refresh_list(select=dlg.created_slug)
+            self._load_project(self.store.get(dlg.created_slug))
 
     # -- partage de projets (.rls) -----------------------------------------------------
     def _export_dialog(self):
@@ -1083,7 +1033,9 @@ class MainWindow(QMainWindow):
         self.c_rew_step.setData([], [])
 
     def _log(self, text):
-        self.logbox.appendPlainText(text)
+        stamp = time.strftime("%H:%M:%S")
+        for line in str(text).rstrip().splitlines() or [""]:
+            self.logbox.appendPlainText(f"[{stamp}] {line}")
 
     def _start(self):
         if not self.project or not self._save():
@@ -1097,8 +1049,11 @@ class MainWindow(QMainWindow):
         self.logbox.clear()
         self._total_steps = int(self.project.cfg["algo"]["total_timesteps"])
         self.progress.setRange(0, self._total_steps)
+        self._t_run, self._t_learn, self._steps_learn0, self._phase_base = time.monotonic(), None, 0, False
+        self._log("Lancement de l'entrainement...")
         self.worker = TrainRunner(self.project, self.settings, self)
         self.worker.episode.connect(self._on_episode)
+        self.worker.progress.connect(self._on_progress)
         self.worker.state.connect(self._on_state)
         self.worker.baseline.connect(self._on_baseline)
         self.worker.meta.connect(self._on_meta)
@@ -1113,12 +1068,19 @@ class MainWindow(QMainWindow):
         self.btn_start.setEnabled(False)
         self.btn_stop.setEnabled(True)
         self.plist.setEnabled(False)
-        self.status.setText("Entrainement en cours...")
+        self.status.setText("Demarrage de l'environnement...")
+
+    def _on_progress(self, stage, fraction):
+        if stage == "baseline":
+            self._phase_base = True
+            self.progress.setRange(0, 1000)
+            self.progress.setValue(int(fraction * 1000))
+            self.status.setText(f"Evaluation de reference : {fraction * 100:.0f} %")
 
     def _stop(self):
         if self.worker:
             self.worker.stop()
-            self.status.setText("Arret demande...")
+            self.status.setText("Arret...")
 
     def _on_meta(self, obs_names, act_names):
         self.p_obs.set_names(obs_names)
@@ -1140,10 +1102,24 @@ class MainWindow(QMainWindow):
         self.m_eps.set(str(n))
         self.m_last.set(f"{reward:.2f}")
         self.m_best.set(f"{max(self.rewards):.2f}")
-        self.status.setText(f"Episode {n}")
+        extra = ""
+        if self._t_learn is not None and steps > self._steps_learn0:
+            done = steps - self._steps_learn0
+            rate = done / max(time.monotonic() - self._t_learn, 1e-6)
+            left = max(self._total_steps - steps, 0) / rate
+            extra = f" | {rate:.1f} pas/s | reste ~{fmt_duration(left)}"
+            self.status.setText(f"Episode {n} - reste ~{fmt_duration(left)}")
+        else:
+            self.status.setText(f"Episode {n}")
+        self._log(f"Episode {n} | {length} pas | recompense {reward:.2f} | meilleure {max(self.rewards):.2f}{extra}")
         self._reset_trace()
 
     def _on_state(self, s):
+        if self._t_learn is None:  # premier pas d'apprentissage : fin de la phase de preparation
+            self._t_learn, self._steps_learn0 = time.monotonic(), s["timesteps"] - 1
+            self._log(f"Apprentissage demarre (preparation : {fmt_duration(self._t_learn - self._t_run)}).")
+            self.progress.setRange(0, self._total_steps)
+            self.status.setText("Apprentissage en cours...")
         self.m_steps.set(f"{s['timesteps']:,}".replace(",", " "))
         self.progress.setValue(min(s["timesteps"], self._total_steps))
         if self._ep_start is None:
@@ -1155,7 +1131,7 @@ class MainWindow(QMainWindow):
         self.c_rew_step.setData(self.tr_rew)
 
     def _on_finished(self, message):
-        self._log(message)
+        self._log(message + f"  (duree totale : {fmt_duration(time.monotonic() - self._t_run)})")
         self.status.setText("Termine." if message.startswith("Termine") else
                             "Arrete." if message.startswith("Arrete") else "Erreur - voir le journal")
         self.worker = None

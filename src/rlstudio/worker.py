@@ -10,6 +10,8 @@ Protocole : une ligne JSON par evenement sur stdout ; la commande `stop` arrive 
   evaluate     --project DIR --run NOM [--policy agent|distill:ID]   rejoue des episodes en direct
   distill      --project DIR --run NOM [--options JSON]   extrait un modele mathematique d'un run
   export-simulink --project DIR --run NOM --candidate ID --out FILE   controleur extrait -> modele Simulink
+  analyze-model --model FILE [--init FILE]     analyse un modele Simulink existant (conversion)
+  convert-model --spec FILE --out DIR          cree un projet depuis une copie convertie du modele, puis le teste a vide
 """
 import argparse
 import json
@@ -72,12 +74,23 @@ def cmd_train(args):
         emit(type="state", timesteps=int(s["timesteps"]), obs=np.asarray(s["obs"], dtype=float).round(5).tolist(),
              action=np.atleast_1d(s["action"]).astype(float).round(5).tolist(), reward=float(s["reward"]))
 
+    last_progress = [0.0]
+
+    def on_progress(stage, fraction):
+        now = time.monotonic()
+        if fraction < 1.0 and now - last_progress[0] < 0.25:  # au plus ~4 mises a jour par seconde
+            return
+        last_progress[0] = now
+        emit(type="progress", stage=stage, fraction=round(float(fraction), 4))
+
     run_dir = train(
         project,
         on_episode=lambda n, r, length, steps: emit(type="episode", n=n, reward=r, length=length, steps=steps),
         on_state=on_state,
         on_baseline=lambda mean, label: emit(type="baseline", mean=mean, label=label),
         on_meta=lambda m: emit(type="meta", **m),
+        on_progress=on_progress,
+        on_run=lambda d: emit(type="run", run_dir=str(d)),
         should_stop=stop.is_set,
         log=lambda m: emit(type="log", text=m),
     )
@@ -156,6 +169,76 @@ def cmd_inspect(args):
         session.close()
 
 
+def cmd_analyze_model(args):
+    from .convert import default_spec
+    from .envs.simulink import MatlabSession
+
+    session = MatlabSession()
+    try:
+        emit(type="log", text="Analyse du modele...")
+        analysis = session.analyze(args.model, args.init or "")
+        emit(type="result", analysis=analysis, proposal=default_spec(analysis))
+    finally:
+        session.close()
+
+
+def _check_environment(project_dir, env_cfg, session, steps=3):
+    """Test a vide : reset + quelques pas a l'action mediane ; renvoie un dict {ok, ...} sans lever d'exception."""
+    import numpy as np
+
+    from .envs.simulink import SimulinkEnv
+
+    env = SimulinkEnv(project_dir, env_cfg, session=session)
+    try:
+        t0 = time.time()
+        obs, _ = env.reset(seed=0)
+        mid = (env.action_space.low + env.action_space.high) / 2.0
+        reward, ms = 0.0, []
+        for _ in range(steps):
+            t = time.time()
+            obs, r, term, trunc, _ = env.step(mid.astype(np.float32))
+            ms.append((time.time() - t) * 1000)
+            reward += r
+            if term or trunc:
+                break
+        return {"ok": True, "obs": {n: round(float(v), 5) for n, v in zip(env.obs_names, obs)}, "reward": round(float(reward), 5),
+                "ms_per_step": round(float(np.mean(ms)), 1), "episode_steps": env.n_steps, "first_reset_s": round(time.time() - t0, 1)}
+    except Exception as e:
+        return {"ok": False, "error": f"{type(e).__name__}: {e}"}
+
+
+def cmd_convert_model(args):
+    import shutil
+    from pathlib import Path
+
+    from .convert import matlab_spec, validate_conversion, write_project
+    from .envs.simulink import MatlabSession
+
+    spec = json.loads(Path(args.spec).read_text(encoding="utf-8"))
+    errs = validate_conversion(spec)
+    if errs:
+        raise ValueError("Specification invalide :\n- " + "\n- ".join(errs))
+    out_dir = Path(args.out)
+    if out_dir.exists():
+        raise FileExistsError(f"Le dossier existe deja : {out_dir}")
+    out_dir.mkdir(parents=True)
+    session = MatlabSession()
+    try:
+        try:
+            model_name = Path(spec["model_path"]).stem
+            emit(type="log", text="Conversion du modele (copie : l'original n'est pas modifie)...")
+            result = session.convert(spec["model_path"], out_dir / f"{model_name}.slx", matlab_spec(spec), spec.get("init_path") or "")
+            cfg = write_project(out_dir, spec, result)
+        except Exception:
+            shutil.rmtree(out_dir, ignore_errors=True)  # pas de projet a moitie cree
+            raise
+        emit(type="log", text="Test a vide : un episode court sur le modele converti...")
+        check = _check_environment(out_dir, cfg["env"], session)
+        emit(type="result", slug=out_dir.name, project_dir=str(out_dir), warnings=result.get("warnings") or [], check=check)
+    finally:
+        session.close()
+
+
 def cmd_matlab_test(_args):
     import matlab.engine
 
@@ -208,6 +291,12 @@ def main(argv=None):
     p = sub.add_parser("inspect")
     p.add_argument("--model", required=True)
     sub.add_parser("matlab-test")
+    p = sub.add_parser("analyze-model")
+    p.add_argument("--model", required=True)
+    p.add_argument("--init")
+    p = sub.add_parser("convert-model")
+    p.add_argument("--spec", required=True, help="fichier JSON de la specification (voir convert.py)")
+    p.add_argument("--out", required=True, help="dossier du nouveau projet (ne doit pas exister)")
     sub.add_parser("env-info")
     p = sub.add_parser("distill")
     p.add_argument("--project", required=True)
@@ -227,6 +316,7 @@ def main(argv=None):
     p.add_argument("--out", required=True)
     args = ap.parse_args(argv)
     handlers = {"train": cmd_train, "inspect": cmd_inspect, "matlab-test": cmd_matlab_test, "env-info": cmd_env_info,
+                "analyze-model": cmd_analyze_model, "convert-model": cmd_convert_model,
                 "distill": cmd_distill, "evaluate": cmd_evaluate, "export-simulink": cmd_export_simulink}
     try:
         handlers[args.cmd](args)
