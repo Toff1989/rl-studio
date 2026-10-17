@@ -6,6 +6,8 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.3.1] - 2026-10-17
+
 ### Ajouté
 - **Onglet Évaluation** : rejoue un run entraîné (ou un modèle mathématique extrait) avec la politique déterministe et
   trace en direct les observations, les actions, la récompense cumulée et le retour par épisode ; choix du run, de la
@@ -90,6 +92,7 @@ d'apprentissage par renforcement, pilotant des environnements Python ou des mod�
 - Testé avec MATLAB R2026b, Python 3.12, NVIDIA RTX 5080 (CUDA 13) ; les autres configurations sont couvertes par des
   tests unitaires de planification mais n'ont pas été installées pour de vrai.
 
-[Non publié]: https://github.com/Toff1989/rl-studio/compare/0.3.0...HEAD
+[Non publié]: https://github.com/Toff1989/rl-studio/compare/0.3.1...HEAD
+[0.3.1]: https://github.com/Toff1989/rl-studio/compare/0.3.0...0.3.1
 [0.3.0]: https://github.com/Toff1989/rl-studio/compare/0.2.0...0.3.0
 [0.2.0]: https://github.com/Toff1989/rl-studio/releases/tag/0.2.0

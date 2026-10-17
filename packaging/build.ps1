@@ -11,7 +11,7 @@
   python.org (Python embarque) et bootstrap.pypa.io (get-pip.py).
 #>
 param(
-  [string]$Version = "0.3.0",
+  [string]$Version = "0.3.1",
   [string]$PythonEmbedVersion = "3.12.10",   # derniere 3.12 avec binaires Windows
   [switch]$SkipVendor,
   [switch]$SkipInstaller
