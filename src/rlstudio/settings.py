@@ -22,13 +22,13 @@ class Settings:
         self.path = Path(path) if path else USER_DIR / "settings.json"
         self.data = {}
         try:
-            self.data = json.loads(self.path.read_text(encoding="utf-8"))
+            self.data = json.loads(self.path.read_text(encoding="utf-8-sig"))
         except (OSError, ValueError):
             pass
 
     def reload(self):
         try:
-            self.data = json.loads(self.path.read_text(encoding="utf-8"))
+            self.data = json.loads(self.path.read_text(encoding="utf-8-sig"))
         except (OSError, ValueError):
             self.data = {}
 

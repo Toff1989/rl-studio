@@ -218,7 +218,7 @@ def import_project(path, store: ProjectStore, name: str | None = None) -> Projec
                             raise ArchiveError("Archive trop volumineuse une fois decompressee.")
                         dst.write(chunk)
         try:
-            cfg = yaml.safe_load((root / "project.yaml").read_text(encoding="utf-8"))
+            cfg = yaml.safe_load((root / "project.yaml").read_text(encoding="utf-8-sig"))
         except (yaml.YAMLError, UnicodeDecodeError) as e:
             raise ArchiveError(f"project.yaml illisible : {e}")
         _validate_config(cfg)

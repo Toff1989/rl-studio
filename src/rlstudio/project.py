@@ -47,7 +47,7 @@ class Project:
         return self.path / "runs"
 
     def reload(self):
-        with open(self.path / "project.yaml", encoding="utf-8") as fh:
+        with open(self.path / "project.yaml", encoding="utf-8-sig") as fh:
             self.cfg = yaml.safe_load(fh) or {}
         algo = copy.deepcopy(DEFAULT_ALGO)
         algo.update(self.cfg.get("algo") or {})

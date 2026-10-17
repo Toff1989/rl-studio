@@ -12,3 +12,6 @@
 *.exe binary
 *.dll binary
 *.pyd binary
+
+# scripts batch : CRLF obligatoire (les etiquettes goto/call echouent avec des LF seuls)
+*.bat text eol=crlf
