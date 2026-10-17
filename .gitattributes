@@ -1,0 +1,14 @@
+# Fins de ligne : LF partout dans le depot et dans les copies de travail (evite les diffs parasites Windows/Linux)
+* text=auto eol=lf
+
+# fichiers binaires : jamais convertis ni compares ligne a ligne
+*.ico binary
+*.png binary
+*.jpg binary
+*.slx binary
+*.mdl binary
+*.rls binary
+*.zip binary
+*.exe binary
+*.dll binary
+*.pyd binary

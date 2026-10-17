@@ -1,0 +1,17 @@
+template_name: Pendule inverse (CartPole)
+template_description: "Exemple classique de controle : equilibrer un pendule sur un chariot avec une force continue. Environnement Python autonome (sans simulateur externe)."
+name: Pendule inverse
+description: Maintenir le pendule vertical le plus longtemps possible en poussant le chariot.
+kind: python
+env:
+  entry: env.py:make_env
+  params:
+    force_mag: 10.0     # force maximale appliquee au chariot [N]
+    max_steps: 500      # duree d'un episode (pas de 0,02 s)
+algo:
+  name: SAC
+  total_timesteps: 30000
+  seed: 0
+  device: cpu
+  baseline_episodes: 3
+  kwargs: {}

@@ -1,0 +1,19 @@
+template_name: Simulink (mapping YAML)
+template_description: Pilote un modele Simulink existant ; on choisit les blocs/signaux observes, les parametres commandes et la recompense, sans ecrire de code.
+name: Nouveau projet Simulink
+description: ""
+kind: simulink
+env:
+  model: model.slx          # copier votre modele dans le dossier du projet
+  step_s: 60
+  episode_s: 3600
+  actions:
+    - {name: u, block: "model/Constant", param: Value, low: 0.0, high: 1.0}
+  observations:
+    - {name: y, block: "model/Plant", port: 1, size: 1}
+  initial: []
+  reward: "-(y - 1.0)**2"
+  terminate: ""
+algo:
+  name: SAC
+  total_timesteps: 20000

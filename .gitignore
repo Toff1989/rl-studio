@@ -1,0 +1,42 @@
+# --- environnements Python -------------------------------------------------------------------
+.venv/
+.buildvenv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# --- builds et installateur (produits par packaging/build.ps1) ----------------------------------
+build/
+dist/
+dist-installer/
+# Python embarque + get-pip.py, telecharges par build.ps1
+packaging/vendor/
+# icon.ico est versionne (necessaire a l'installateur), pas l'apercu png
+packaging/icon.png
+
+# --- donnees de travail : projets de l'utilisateur et resultats d'entrainement -------------------
+# Le dossier projects/ existe (via .gitkeep) mais son contenu n'est pas versionne : les projets se partagent en .rls.
+projects/*
+!projects/.gitkeep
+runs/
+
+# --- fichiers generes par MATLAB / Simulink ------------------------------------------------------
+slprj/
+*.slxc
+*.autosave
+*.asv
+matlab/*.slx
+
+# --- divers --------------------------------------------------------------------------------------
+*.log
+*.part
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# --- reglages locaux de l'assistant de code (chemins personnels) ---------------------------------
+.claude/settings.local.json

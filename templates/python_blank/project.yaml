@@ -1,0 +1,11 @@
+template_name: Python vide
+template_description: Environnement Gymnasium ecrit en Python (modele simple a completer dans env.py).
+name: Nouveau projet
+description: ""
+kind: python
+env:
+  entry: env.py:make_env
+  params: {}
+algo:
+  name: SAC
+  total_timesteps: 50000

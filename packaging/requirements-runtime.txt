@@ -1,0 +1,6 @@
+# Bibliotheques de calcul installees dans le runtime (PyTorch et matlabengine sont installes a part,
+# avec la variante adaptee au materiel : voir src/rlstudio/components.py).
+numpy
+pyyaml
+gymnasium>=1.0
+stable-baselines3>=2.4

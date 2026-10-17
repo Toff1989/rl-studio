@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rlstudio"
+version = "0.2.0"
+description = "Studio de gestion de projets d apprentissage par renforcement (Python + Simulink)"
+requires-python = ">=3.10,<3.13"
+license = {text = "MIT"}
+authors = [{name = "Christophe Barras"}]
+# Noyau minimal : l'interface (gui) et le runtime de calcul (runtime) sont des extras separes,
+# car l'application installee les installe dans deux endroits differents.
+dependencies = ["numpy", "pyyaml"]
+
+[project.urls]
+Homepage = "https://github.com/Toff1989/rl-studio"
+Issues = "https://github.com/Toff1989/rl-studio/issues"
+Changelog = "https://github.com/Toff1989/rl-studio/blob/main/CHANGELOG.md"
+
+[project.optional-dependencies]
+gui = [
+    "PySide6>=6.7,<6.9",  # 6.12 echoue au chargement des DLL sur certaines machines
+    "pyqtgraph",
+]
+runtime = ["gymnasium", "stable-baselines3"]  # + torch, installe selon le GPU (voir components.py)
+# R2026b -> matlabengine 26.2.x ; la version exacte est choisie a l'installation selon MATLAB
+matlab = ["matlabengine==26.2.*"]
+dev = ["pytest"]
+build = ["pyinstaller"]
+
+[project.scripts]
+rlstudio = "rlstudio.cli:main"
+rlstudio-gui = "rlstudio.launcher:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
