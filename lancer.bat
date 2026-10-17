@@ -2,11 +2,11 @@
 rem ---------------------------------------------------------------------------------------------
 rem  RL Studio - lanceur : mode developpement ou mode compile.
 rem
-rem    lancer.bat              menu interactif
+rem    lancer.bat              menu interactif (taper 1, 2, 3 ou Q puis Entree)
 rem    lancer.bat dev          lance directement le mode developpement
 rem    lancer.bat compile      lance directement la version compilee
 rem    lancer.bat build        reconstruit la version compilee puis la lance
-rem    lancer.bat <mode> dry   affiche la commande sans l'executer (verification)
+rem    lancer.bat menu dry     le deuxieme argument "dry" affiche la commande sans l'executer
 rem
 rem  La fenetre se ferme toute seule apres le lancement ; elle ne reste ouverte (pause) que
 rem  si quelque chose ne va pas, pour que vous puissiez lire le message.
@@ -19,6 +19,8 @@ set "PYTHON=.venv\Scripts\python.exe"
 set "EXE=dist\rlstudio\rlstudio.exe"
 set "MODE=%~1"
 set "DRY=%~2"
+set "TENTATIVES=0"
+set "MSG="
 
 if /i "%MODE%"=="dev" goto dev
 if /i "%MODE%"=="compile" goto compile
@@ -37,11 +39,17 @@ echo                              (comme chez un utilisateur final)
 echo    [3]  RECONSTRUIRE         recompile puis lance le mode compile
 echo    [Q]  Quitter
 echo.
-choice /C 123Q /N /M "Votre choix [1/2/3/Q] : "
-if errorlevel 4 goto fin
-if errorlevel 3 goto build
-if errorlevel 2 goto compile
-if errorlevel 1 goto dev
+if defined MSG echo    ^>^> %MSG%
+if defined MSG echo.
+set "CHOIX="
+set /p "CHOIX=Votre choix (1, 2, 3 ou Q) puis Entree : "
+if /i "%CHOIX%"=="1" goto dev
+if /i "%CHOIX%"=="2" goto compile
+if /i "%CHOIX%"=="3" goto build
+if /i "%CHOIX%"=="Q" goto fin
+set /a TENTATIVES+=1
+if %TENTATIVES% GEQ 5 goto fin
+set "MSG=Choix invalide : tapez 1, 2, 3 ou Q."
 goto menu
 
 :dev
@@ -71,9 +79,10 @@ goto erreur
 if exist "%EXE%" goto compile_ok
 echo.
 echo [ATTENTION] La version compilee n'existe pas encore : %EXE%
-choice /C ON /N /M "La construire maintenant (environ 2 minutes) ? [O/N] : "
-if errorlevel 2 goto fin
-goto build
+set "REP="
+set /p "REP=La construire maintenant (environ 2 minutes) ? (O/N) : "
+if /i "%REP%"=="O" goto build
+goto fin
 :compile_ok
 echo.
 echo Lancement de la version COMPILEE ...

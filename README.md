@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.2.0-4f7cf0">
+  <img alt="version" src="https://img.shields.io/badge/version-0.3.0-4f7cf0">
   <img alt="licence MIT" src="https://img.shields.io/badge/licence-MIT-3ecf8e">
   <img alt="Python 3.12" src="https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white">
   <img alt="Windows" src="https://img.shields.io/badge/plateforme-Windows-0078D6?logo=windows&logoColor=white">
@@ -27,6 +27,7 @@
 - **Deux types d'environnements** : Python (`gymnasium.Env`) ou modèle Simulink décrit sans code (signaux, paramètres, récompense).
 - **Partage** : export/import de projets en un seul fichier **`.rls`** (double-clic ou glisser-déposer).
 - **Entraînement** en direct (récompense, observation, actions) avec comparaison à une politique de référence.
+- **Modèle mathématique** : extraction de la politique apprise sous forme de PID, table de gains, arbre de décision ou équation, validée en boucle fermée, exportable en Python / MATLAB / Simulink ([détails](docs/distillation.md)).
 - **Installateur Windows** qui détecte le matériel (GPU NVIDIA, MATLAB) et installe les composants adaptés.
 - **Thèmes** Sombre, Clair, Matrix et personnalisables ; tous les réglages généraux dans la fenêtre *Paramètres*.
 
@@ -104,6 +105,14 @@ un **nouveau** projet (jamais d'écrasement).
 > N'importez que des projets de personnes de confiance : l'application affiche la liste des fichiers de code et demande
 > une confirmation. L'import refuse les chemins dangereux (`..`, absolus, liens), les archives piégées (taille,
 > compression) et tout exécutable ou script système (`.exe`, `.dll`, `.bat`, `.ps1`…).
+
+## Extraire un modèle mathématique de l'agent
+
+L'onglet **Modèle mathématique** (ou `rlstudio distill <projet>`) transforme la politique apprise en loi de commande
+lisible : régulateur linéaire/PID, table de gains, arbre de décision, équation parcimonieuse, ou copie exacte du réseau.
+Les modèles sont ajustés sur les décisions de l'agent, corrigés par DAgger, comparés en simulation (score normalisé,
+complexité, fidélité) ; le plus simple qui reste dans la tolérance est recommandé. Export Python, MATLAB et contrôleur
+Simulink. Voir [docs/distillation.md](docs/distillation.md).
 
 ## Remarques
 

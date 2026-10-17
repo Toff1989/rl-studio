@@ -7,6 +7,8 @@ Protocole : une ligne JSON par evenement sur stdout ; la commande `stop` arrive 
   inspect      --model FILE                      blocs d'un modele Simulink
   matlab-test                                    demarre MATLAB et verifie Simulink
   env-info                                       versions installees (Python, PyTorch, CUDA...)
+  distill      --project DIR --run NOM [--options JSON]   extrait un modele mathematique d'un run
+  export-simulink --project DIR --run NOM --candidate ID --out FILE   controleur extrait -> modele Simulink
 """
 import argparse
 import json
@@ -80,6 +82,42 @@ def cmd_train(args):
     emit(type="done", run_dir=str(run_dir), stopped=stop.is_set())
 
 
+def _run_dir(project, name):
+    d = project.runs_dir / name
+    if not d.is_dir():
+        raise FileNotFoundError(f"run introuvable : {name}")
+    return d
+
+
+def cmd_distill(args):
+    from .distill import DistillOptions, run_distillation
+    from .distill.collect import Stopped
+    from .project import Project
+
+    project = Project(args.project)
+    options = DistillOptions.from_dict(json.loads(args.options) if args.options else None)
+    stop = threading.Event()
+    threading.Thread(target=_listen_for_stop, args=(stop,), daemon=True).start()
+    try:
+        report = run_distillation(project, _run_dir(project, args.run), options, log=lambda m: emit(type="log", text=m),
+                                  progress=lambda stage, frac: emit(type="progress", stage=stage, fraction=round(frac, 4)),
+                                  should_stop=stop.is_set)
+    except Stopped:
+        emit(type="done", stopped=True)
+        return
+    emit(type="done", stopped=False, recommended=report["recommended"])
+
+
+def cmd_export_simulink(args):
+    from .distill.export import build_simulink_controller, load_candidate
+    from .project import Project
+
+    project = Project(args.project)
+    run_dir = _run_dir(project, args.run)
+    out = build_simulink_controller(load_candidate(run_dir, args.candidate), args.out, log=lambda m: emit(type="log", text=m))
+    emit(type="result", path=str(out))
+
+
 def cmd_inspect(args):
     from .envs.simulink import MatlabSession
 
@@ -143,8 +181,18 @@ def main(argv=None):
     p.add_argument("--model", required=True)
     sub.add_parser("matlab-test")
     sub.add_parser("env-info")
+    p = sub.add_parser("distill")
+    p.add_argument("--project", required=True)
+    p.add_argument("--run", required=True)
+    p.add_argument("--options")
+    p = sub.add_parser("export-simulink")
+    p.add_argument("--project", required=True)
+    p.add_argument("--run", required=True)
+    p.add_argument("--candidate", required=True)
+    p.add_argument("--out", required=True)
     args = ap.parse_args(argv)
-    handlers = {"train": cmd_train, "inspect": cmd_inspect, "matlab-test": cmd_matlab_test, "env-info": cmd_env_info}
+    handlers = {"train": cmd_train, "inspect": cmd_inspect, "matlab-test": cmd_matlab_test, "env-info": cmd_env_info,
+                "distill": cmd_distill, "export-simulink": cmd_export_simulink}
     try:
         handlers[args.cmd](args)
     except Exception as e:

@@ -16,6 +16,16 @@ def main(argv=None):
     p = sub.add_parser("train", help="entraine un projet")
     p.add_argument("slug")
     p.add_argument("--timesteps", type=int)
+    p = sub.add_parser("distill", help="extrait un modele mathematique (PID, table, arbre, equation) d'un run")
+    p.add_argument("slug")
+    p.add_argument("--run", help="nom du run (defaut : le plus recent)")
+    p.add_argument("--methods", default="linear,table,tree,symbolic,neural", help="liste separee par des virgules")
+    p.add_argument("--episodes", type=int, default=20)
+    p.add_argument("--dagger", type=int, default=3, help="tours de DAgger (0 pour desactiver)")
+    p.add_argument("--eval-episodes", type=int, default=10)
+    p.add_argument("--margin", type=float, default=0.05)
+    p.add_argument("--integrators", default="", help="observations a integrer (PID), separees par des virgules")
+    p.add_argument("--seed", type=int, default=0)
     p = sub.add_parser("delete", help="met un projet a la corbeille (.trash/)")
     p.add_argument("slug")
     p = sub.add_parser("export", help="exporte un projet dans un fichier .rls")
@@ -61,6 +71,20 @@ def main(argv=None):
             print("Importe :", import_project(args.fichier, store).path)
         except ArchiveError as e:
             raise SystemExit(str(e))
+    elif args.cmd == "distill":
+        from .distill import DistillOptions, run_distillation
+        from .distill.export import distill_dir
+
+        pr = store.get(args.slug)
+        runs = pr.list_runs()
+        if not runs:
+            raise SystemExit("Aucun run : entrainer le projet d'abord.")
+        run_dir = pr.runs_dir / args.run if args.run else runs[0]
+        opts = DistillOptions(methods=tuple(m for m in args.methods.split(",") if m), episodes=args.episodes, dagger_iters=args.dagger,
+                              eval_episodes=args.eval_episodes, margin=args.margin, seed=args.seed,
+                              integrators=tuple(i for i in args.integrators.split(",") if i))
+        rep = run_distillation(pr, run_dir, opts)
+        print(f"Modele recommande : {rep['recommended']}  (rapport et fichiers : {distill_dir(run_dir)})")
     elif args.cmd == "train":
         pr = store.get(args.slug)
         if args.timesteps:

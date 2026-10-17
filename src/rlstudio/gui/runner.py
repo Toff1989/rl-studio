@@ -114,6 +114,38 @@ class TrainRunner(QObject):
         self.finished.emit(self._final or f"ERREUR : le processus de calcul s'est arrete (code {code}).")
 
 
+class DistillRunner(TrainRunner):
+    """Extraction d'un modele mathematique (commande `distill` du worker) ; meme protocole que l'entrainement + `progress`."""
+
+    progress = Signal(str, float)
+
+    def __init__(self, project, settings: Settings, run_name: str, options: dict, parent=None):
+        super().__init__(project, settings, parent)
+        self.run_name, self.options = run_name, options
+
+    def start(self):
+        self.proc = _worker_process(self.settings, ["distill", "--project", str(self.project.path), "--run", self.run_name,
+                                                    "--options", json.dumps(self.options)], self)
+        self.proc.readyReadStandardOutput.connect(self._on_output)
+        self.proc.finished.connect(self._on_finished)
+        self.proc.errorOccurred.connect(self._on_error)
+        self.proc.start()
+
+    def _handle(self, line: str):
+        if line.startswith("{"):
+            try:
+                ev = json.loads(line)
+            except ValueError:
+                ev = {}
+            if ev.get("type") == "progress":
+                self.progress.emit(ev.get("stage", ""), float(ev.get("fraction", 0)))
+                return
+            if ev.get("type") == "done":
+                self._final = "Arrete." if ev.get("stopped") else "Termine."
+                return
+        super()._handle(line)
+
+
 class WorkerJob(QObject):
     """Commande ponctuelle du worker (inspect, matlab-test, env-info) ; resultat via `done`."""
 

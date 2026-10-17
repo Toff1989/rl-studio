@@ -28,6 +28,7 @@ from ..training import ALGOS
 from . import theme
 from .theme import C
 from .. import runtime
+from .distill_tab import DistillTab
 from .runner import RuntimeMissing, TrainRunner, WorkerJob
 from .settings_dialog import SettingsDialog
 from .widgets import Card, Kpi, button, column, fmt_run_date, label, scroll_page
@@ -339,6 +340,9 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self._tab_algo(), "Algorithme")
         self.tabs.addTab(self._tab_train(), "Entrainement")
         self.tabs.addTab(self._tab_runs(), "Resultats")
+        self.distill = DistillTab(self.settings)
+        self.distill.busy.connect(lambda b: self.plist.setEnabled(not b))
+        self.tabs.addTab(self.distill, "Modele mathematique")
         ml.addWidget(self.tabs, 1)
 
         root = QHBoxLayout()
@@ -593,6 +597,8 @@ class MainWindow(QMainWindow):
         self.c_obs.setPen(pg.mkPen(C["magenta"], width=2))
         self.c_obs.setSymbolBrush(C["magenta"])
         self.c_rew_step.setPen(pg.mkPen(C["success"], width=2))
+        if hasattr(self, "distill"):
+            self.distill.restyle()
         colors = self._series_colors()
         for i, curve in enumerate(self.act_curves):
             curve.setPen(pg.mkPen(colors[i % len(colors)], width=2))
@@ -941,6 +947,7 @@ class MainWindow(QMainWindow):
         self.a_base.setValue(int(a.get("baseline_episodes", 0)))
         self.a_kwargs.setPlainText(yaml.safe_dump(a.get("kwargs") or {}, sort_keys=False) if a.get("kwargs") else "")
         self._refresh_runs()
+        self.distill.set_project(project)
         self._reset_train_state()
         self._update_dashboard()
         self._set_dirty(False)
@@ -1151,6 +1158,7 @@ class MainWindow(QMainWindow):
         self.btn_stop.setEnabled(False)
         self.plist.setEnabled(True)
         self._refresh_runs()
+        self.distill.set_project(self.project)
         self._update_dashboard()
 
     # -- resultats ----------------------------------------------------------------------
