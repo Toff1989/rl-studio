@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/logo.png" width="120" alt="Logo de RL Studio">
+</p>
+
 <h1 align="center">RL Studio</h1>
 
 <p align="center">

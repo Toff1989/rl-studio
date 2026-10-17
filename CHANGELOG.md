@@ -6,6 +6,11 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+### Modifié
+- **Nouvelle icône** : boucle agent/environnement et point de récompense, dessinée taille par taille
+  (`icon.ico` contient désormais 16, 20, 24, 32, 40, 48, 64, 128 et 256 px au lieu d'une seule taille) ; elle apparaît
+  aussi dans la fenêtre, la barre des tâches et l'en-tête de l'application. Générée par `packaging/make_icon.py`.
+
 ## [0.2.0] - 2026-10-17
 
 Première version publique : RL Studio devient une application Windows installable de gestion de projets

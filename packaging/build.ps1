@@ -61,6 +61,7 @@ $app = "dist\rlstudio"
 New-Item -ItemType Directory -Force "$app\resources", "$app\lib", "$app\vendor" | Out-Null
 Copy-Item -Recurse -Force templates "$app\resources\templates"
 Copy-Item -Recurse -Force matlab "$app\resources\matlab"
+Copy-Item packaging\icon.ico "$app\resources\icon.ico"
 # code Python pur vu par le runtime de calcul (sans l'interface)
 Copy-Item -Recurse -Force src\rlstudio "$app\lib\rlstudio"
 Remove-Item -Recurse -Force "$app\lib\rlstudio\gui" -ErrorAction SilentlyContinue

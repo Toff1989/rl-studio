@@ -10,7 +10,7 @@ import traceback
 import numpy as np
 import pyqtgraph as pg
 import yaml
-from PySide6.QtGui import QColor
+from PySide6.QtGui import QColor, QIcon
 from PySide6.QtCore import QSize, QTimer, Qt, QThread, Signal, Slot, QObject
 from PySide6.QtWidgets import (
     QApplication, QColorDialog, QComboBox, QDialog, QDoubleSpinBox, QFileDialog, QFormLayout, QFrame, QGridLayout,
@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..envs.spec import validate_spec
+from ..paths import ICON_FILE
 from ..project import Project, ProjectStore
 from ..settings import Settings
 from ..training import ALGOS
@@ -199,6 +200,10 @@ class MainWindow(QMainWindow):
         self.worker = None
         self.setWindowTitle("RL Studio")
         self.resize(1440, 900)
+        if ICON_FILE.exists():  # icone de la fenetre, de la barre des taches et des boites de dialogue
+            self._icon = QIcon(str(ICON_FILE))
+            QApplication.instance().setWindowIcon(self._icon)
+            self.setWindowIcon(self._icon)
         self._build_ui()
         self.setAcceptDrops(True)
         self._refresh_list()
@@ -252,11 +257,19 @@ class MainWindow(QMainWindow):
         sl = QVBoxLayout(side)
         sl.setContentsMargins(0, 20, 0, 16)
         sl.setSpacing(10)
-        head = QVBoxLayout()
-        head.setContentsMargins(20, 0, 20, 0)
-        head.setSpacing(0)
-        head.addWidget(label("RL Studio", "appTitle"))
-        head.addWidget(label("Apprentissage par renforcement", "muted"))
+        head = QHBoxLayout()
+        head.setContentsMargins(20, 0, 10, 0)
+        head.setSpacing(10)
+        if ICON_FILE.exists():
+            logo = QLabel()
+            logo.setPixmap(QIcon(str(ICON_FILE)).pixmap(QSize(36, 36)))
+            logo.setFixedSize(36, 36)
+            head.addWidget(logo)
+        titles = QVBoxLayout()
+        titles.setSpacing(0)
+        titles.addWidget(label("RL Studio", "appTitle"))
+        titles.addWidget(label("Apprentissage par renforcement", "muted"))
+        head.addLayout(titles, 1)
         sl.addLayout(head)
         newrow = QHBoxLayout()
         newrow.setContentsMargins(16, 6, 16, 0)

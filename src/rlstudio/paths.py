@@ -19,6 +19,7 @@ RESOURCE_DIR = Path(os.environ.get("RLSTUDIO_RESOURCES") or (APP_DIR / "resource
 TEMPLATES_DIR = RESOURCE_DIR / "templates"
 MATLAB_DIR = RESOURCE_DIR / "matlab"
 VENDOR_DIR = APP_DIR / "vendor" if FROZEN else REPO_ROOT / "packaging" / "vendor"
+ICON_FILE = RESOURCE_DIR / "icon.ico" if FROZEN else REPO_ROOT / "packaging" / "icon.ico"
 # mentions legales (copiees a cote de l'exe par build.ps1 ; a la racine du depot en developpement)
 LICENSE_FILE = APP_DIR / "LICENSE"
 NOTICES_FILE = APP_DIR / "THIRD_PARTY_NOTICES.md"
