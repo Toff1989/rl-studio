@@ -6,6 +6,9 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+### Corrigé
+- Graphiques temporels (Entraînement, Évaluation) : la légende des signaux n'est plus dessinée sur la courbe mais sous le graphique, en couleurs lisibles.
+
 ## [0.3.1] - 2026-10-17
 
 ### Ajouté

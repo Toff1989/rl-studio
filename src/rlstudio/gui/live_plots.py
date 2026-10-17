@@ -2,6 +2,7 @@
 import numpy as np
 import pyqtgraph as pg
 from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
 from .theme import C
 
@@ -12,17 +13,26 @@ def palette():
     return [C["accent"], C["warning"], C["success"], C["magenta"], C["danger"], C["muted"]]
 
 
-class SeriesPlot(pg.PlotWidget):
-    """Une courbe par signal, legende avec les noms ; `normalized` affiche chaque signal ramene a [-1, 1]."""
+class SeriesPlot(QWidget):
+    """Une courbe par signal ; la legende (noms colores) est sous le graphique, jamais dessus. `normalized` : [-1, 1]."""
 
     def __init__(self, title, xlabel="pas"):
         super().__init__()
-        self.setObjectName("plot")
         self._title, self._xlabel = title, xlabel
-        self.showGrid(x=True, y=True, alpha=0.12)
-        self.setMenuEnabled(False)
-        self.setMinimumHeight(220)
-        self.legend = self.addLegend(offset=(8, 8))
+        self.pw = pg.PlotWidget()
+        self.pw.setObjectName("plot")
+        self.pw.showGrid(x=True, y=True, alpha=0.12)
+        self.pw.setMenuEnabled(False)
+        self.pw.setMinimumHeight(180)
+        self.legend_label = QLabel()
+        self.legend_label.setTextFormat(Qt.RichText)
+        self.legend_label.setWordWrap(True)
+        self.legend_label.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(4)
+        lay.addWidget(self.pw, 1)
+        lay.addWidget(self.legend_label)
         self.names, self.curves, self.t, self.rows, self.normalized = [], [], [], [], False
         self.restyle()
 
@@ -36,12 +46,12 @@ class SeriesPlot(pg.PlotWidget):
 
     def _rebuild(self):
         for c in self.curves:
-            self.removeItem(c)
-        self.legend.clear()
+            self.pw.removeItem(c)
         self.curves = []
         cols = palette()
         for i, name in enumerate(self.names):
-            self.curves.append(self.plot(pen=pg.mkPen(cols[i % len(cols)], width=2, style=Qt.SolidLine if i < len(cols) else Qt.DashLine), name=name))
+            self.curves.append(self.pw.plot(pen=pg.mkPen(cols[i % len(cols)], width=2, style=Qt.SolidLine if i < len(cols) else Qt.DashLine)))
+        self._legend()
         self._redraw()
 
     def reset(self):
@@ -75,15 +85,23 @@ class SeriesPlot(pg.PlotWidget):
             if i < arr.shape[1]:
                 c.setData(self.t, arr[:, i])
 
+    def _legend(self):
+        cols = palette()
+        text = (C.get("text", "#dddddd"))
+        self.legend_label.setText("&nbsp;&nbsp;&nbsp;".join(
+            f'<span style="color:{cols[i % len(cols)]}; font-size:14pt">&#9632;</span> <span style="color:{text}">{n}</span>'
+            for i, n in enumerate(self.names)))
+
     def restyle(self):
         if "surface" not in C:
             return
-        self.setBackground(C["surface"])
-        self.setTitle(self._title, color=C["text"], size="11pt")
-        self.setLabel("bottom", self._xlabel, color=C["muted"])
+        self.pw.setBackground(C["surface"])
+        self.pw.setTitle(self._title, color=C["text"], size="11pt")
+        self.pw.setLabel("bottom", self._xlabel, color=C["muted"])
         for ax in ("left", "bottom"):
-            self.getAxis(ax).setPen(C["border2"])
-            self.getAxis(ax).setTextPen(C["muted"])
+            self.pw.getAxis(ax).setPen(C["border2"])
+            self.pw.getAxis(ax).setTextPen(C["muted"])
+        self._legend()
         cols = palette()
         for i, c in enumerate(self.curves):
             c.setPen(pg.mkPen(cols[i % len(cols)], width=2, style=Qt.SolidLine if i < len(cols) else Qt.DashLine))
