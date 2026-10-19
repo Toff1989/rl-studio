@@ -6,6 +6,11 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.3.5] - 2026-10-19
+
+### Corrigé
+- **Interface fluide pendant les calculs** (entraînement, évaluation, extraction de modèle) : les graphiques ajoutent un point en temps constant et se redessinent par paquets (≈ 25 fois par seconde au plus, moins souvent sur les longs épisodes) avec au plus ~1500 points tracés par courbe (pics conservés) ; les journaux sont bornés à 5000 lignes ; le bouton *Arrêter* ne bloque plus l'interface (`taskkill` en arrière-plan) ; le processus de calcul, MATLAB compris, tourne en priorité inférieure à la normale (`RLSTUDIO_NORMAL_PRIORITY=1` pour l'annuler).
+
 ## [0.3.4] - 2026-10-19
 
 ### Ajouté

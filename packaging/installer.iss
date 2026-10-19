@@ -12,7 +12,7 @@
 
 #define AppName "RL Studio"
 #ifndef AppVersion
-  #define AppVersion "0.3.4"
+  #define AppVersion "0.3.5"
 #endif
 
 #if !FileExists(SourcePath + "..\dist\rlstudio\vendor\get-pip.py")
