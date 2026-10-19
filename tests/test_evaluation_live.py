@@ -108,3 +108,52 @@ def test_series_plot_many_signals_distinct_colors_and_toggle():
     pl._set_all_visible(True)
     assert all(c.isVisible() for c in pl.curves)
     app.processEvents()
+
+
+def test_series_plot_append_is_cheap_and_coalesced():
+    """L'interface ne doit pas ralentir quand les points s'accumulent : ajout O(1), dessins regroupes."""
+    import time
+
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+
+    from rlstudio.gui.live_plots import SeriesPlot
+
+    app = QApplication.instance() or QApplication([])
+    pl = SeriesPlot("Observations")
+    pl.set_names(["a", "b", "c", "d"])
+    draws = []
+    real = pl._redraw
+    pl._redraw = lambda: (draws.append(1), real())[1]
+    pl._timer.timeout.disconnect()
+    pl._timer.timeout.connect(pl._redraw)
+    t0 = time.perf_counter()
+    for i in range(20000):
+        pl.append(i, [i, 2.0 * i, -i, 0.5 * i])
+    elapsed = time.perf_counter() - t0
+    assert elapsed < 1.0, f"20000 ajouts en {elapsed:.2f} s : l'ajout d'un point n'est plus O(1)"
+    assert not draws                       # rien n'est dessine tant que la boucle d'evenements ne tourne pas
+    assert len(pl.t) == 20000 and pl.t[-1] == 19999
+    app.processEvents()
+    import PySide6.QtTest as qt
+
+    qt.QTest.qWait(120)
+    assert 1 <= len(draws) <= 3            # un seul dessin pour tous les points recus
+    assert np.isclose(pl.curves[1].getData()[1][-1], 2.0 * 19999)
+    pl.reset()
+    assert len(pl.t) == 0
+    pl.append(0, [1.0, 2.0, 3.0, 4.0, 5.0])  # signal non declare apres une remise a zero
+    assert len(pl.curves) == 5
+
+
+def test_decimate_keeps_peaks_and_bounds_size():
+    from rlstudio.gui.live_plots import MAX_DRAWN, decimate
+
+    t = np.arange(50001, dtype=float)
+    y = np.sin(t / 300.0)[:, None]
+    y[12345, 0] = 5.0                       # un pic isole ne doit pas disparaitre
+    t2, y2 = decimate(t, y)
+    assert len(t2) <= MAX_DRAWN + 2 and len(t2) == len(y2)
+    assert y2.max() == 5.0 and t2[-1] == t[-1]
+    small_t, small_y = decimate(t[:100], y[:100])
+    assert small_t is t[:100] or np.array_equal(small_t, t[:100])

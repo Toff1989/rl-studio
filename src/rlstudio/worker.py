@@ -15,10 +15,27 @@ Protocole : une ligne JSON par evenement sur stdout ; la commande `stop` arrive 
 """
 import argparse
 import json
+import os
 import sys
 import threading
 import time
 import traceback
+
+
+def lower_priority():
+    """Le calcul (PyTorch, MATLAB) peut occuper tous les coeurs : on passe en priorite inferieure a la normale pour que
+    l'interface (autre processus) reste fluide. Les processus fils (MATLAB) heritent de cette priorite."""
+    if os.environ.get("RLSTUDIO_NORMAL_PRIORITY") == "1":
+        return
+    try:
+        if sys.platform == "win32":
+            import ctypes
+
+            ctypes.windll.kernel32.SetPriorityClass(ctypes.windll.kernel32.GetCurrentProcess(), 0x00004000)  # BELOW_NORMAL
+        else:
+            os.nice(5)
+    except (OSError, AttributeError):
+        pass
 
 
 def emit(**event):
@@ -278,6 +295,7 @@ def cmd_env_info(_args):
 
 
 def main(argv=None):
+    lower_priority()
     for stream in (sys.stdout, sys.stderr):
         try:
             stream.reconfigure(encoding="utf-8")

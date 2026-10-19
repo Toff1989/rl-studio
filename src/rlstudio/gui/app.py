@@ -45,6 +45,9 @@ OBS_COLS = [("name", "Nom", str), ("block", "Bloc (sortie)", str), ("port", "Por
 INIT_COLS = [("variable", "Variable", str), ("low", "Min", float), ("high", "Max", float)]
 
 
+LOG_MAX_LINES = 5000
+
+
 class SpecTable(QTableWidget):
     """Table editable <-> liste de dicts."""
 
@@ -124,6 +127,10 @@ class MainWindow(QMainWindow):
         self.dirty = False
         self._loading = False
         self.worker = None
+        self._rew_timer = QTimer(self)
+        self._rew_timer.setSingleShot(True)
+        self._rew_timer.setInterval(40)
+        self._rew_timer.timeout.connect(self._flush_rew)
         self.setWindowTitle("RL Studio")
         self.resize(1440, 900)
         if ICON_FILE.exists():  # icone de la fenetre, de la barre des taches et des boites de dialogue
@@ -583,6 +590,7 @@ class MainWindow(QMainWindow):
         self.logbox.setObjectName("mono")
         self.logbox.setReadOnly(True)
         self.logbox.setLineWrapMode(QPlainTextEdit.WidgetWidth)
+        self.logbox.setMaximumBlockCount(LOG_MAX_LINES)  # un journal qui grossit sans limite ralentit tout l'affichage
         self.logbox.setPlaceholderText("Le journal de l'entrainement s'affiche ici : demarrage de MATLAB, "
                                        "evaluation de reference, episodes, vitesse et temps restant.")
         side = Card("Journal")
@@ -1028,6 +1036,7 @@ class MainWindow(QMainWindow):
 
     def _reset_trace(self):
         self.tr_rew, self._ep_start = [], None
+        self._rew_timer.stop()
         self.p_obs.reset()
         self.p_act.reset()
         self.c_rew_step.setData([], [])
@@ -1128,6 +1137,10 @@ class MainWindow(QMainWindow):
         self.p_obs.append(t, s["obs"])
         self.p_act.append(t, np.atleast_1d(s["action"]))
         self.tr_rew.append(s["reward"])
+        if not self._rew_timer.isActive():  # dessin regroupe (~25 / s) : le nombre de points recus ne charge pas l'interface
+            self._rew_timer.start()
+
+    def _flush_rew(self):
         self.c_rew_step.setData(self.tr_rew)
 
     def _on_finished(self, message):

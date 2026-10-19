@@ -1,12 +1,14 @@
 """Graphique temporel multi-courbes (observations, actions) mis a jour en direct."""
 import numpy as np
 import pyqtgraph as pg
-from PySide6.QtCore import QPoint, QRect, QSize, Qt, Signal
+from PySide6.QtCore import QPoint, QRect, QSize, Qt, QTimer, Signal
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QLayout, QScrollArea, QVBoxLayout, QWidget
 
 from .theme import C, luminance
 
 LEGEND_MAX_HEIGHT = 100  # au-dela, la legende defile au lieu de manger la place du graphique
+REDRAW_MS = 40           # les points recus entre deux dessins sont regroupes : au plus ~25 dessins par seconde
+MAX_DRAWN = 1500         # points traces par courbe au maximum : le cout du dessin ne depend plus de la duree de l'episode
 
 
 def palette(n=6):
@@ -25,6 +27,26 @@ def palette(n=6):
         hue = (0.07 + 0.618034 * k) % 1.0  # nombre d'or : teintes toujours bien espacees, quel que soit n
         out.append(QColor.fromHsvF(hue, 0.60 if light else 0.55, 0.70 if light else 0.98).name())
     return out
+
+
+def decimate(t, arr, max_points=MAX_DRAWN):
+    """Reduit (t, arr) a ~max_points lignes en gardant les extrema de chaque paquet (aucun pic n'est perdu)."""
+    n = len(t)
+    if n <= max_points:
+        return t, arr
+    bucket = -(-n // (max_points // 2))          # lignes par paquet (arrondi superieur)
+    full = n // bucket * bucket
+    k = full // bucket
+    tb = t[:full].reshape(k, bucket)
+    ab = arr[:full].reshape(k, bucket, arr.shape[1])
+    with np.errstate(all="ignore"):
+        lo, hi = np.nanmin(ab, axis=1), np.nanmax(ab, axis=1)
+    out_t = np.repeat(tb[:, 0], 2)
+    out = np.empty((2 * k, arr.shape[1]))
+    out[0::2], out[1::2] = lo, hi
+    if full < n:                                  # reste : dernier point exact
+        out_t, out = np.append(out_t, t[-1]), np.vstack([out, arr[-1:]])
+    return out_t, out
 
 
 class FlowLayout(QLayout):
@@ -167,7 +189,13 @@ class SeriesPlot(QWidget):
         lay.setSpacing(4)
         lay.addWidget(self.pw, 1)
         lay.addWidget(self.legend)
-        self.names, self.curves, self.t, self.rows, self.normalized = [], [], [], [], False
+        self.names, self.curves, self.normalized = [], [], False
+        # tampon numpy a croissance geometrique : ajouter un point est O(1), jamais de reconstruction complete
+        self._t, self._y, self._n, self._width = np.empty(256), np.full((256, 1), np.nan), 0, 1
+        self._timer = QTimer(self)
+        self._timer.setSingleShot(True)
+        self._timer.setInterval(REDRAW_MS)
+        self._timer.timeout.connect(self._redraw)
         self.hidden = set()  # noms des courbes masquees par l'utilisateur
         self.restyle()
 
@@ -194,36 +222,54 @@ class SeriesPlot(QWidget):
         self._legend()
         self._redraw()
 
+    @property
+    def t(self):
+        return self._t[:self._n]
+
     def reset(self):
-        self.t, self.rows = [], []
+        self._n = 0
+        self._timer.stop()
         self._redraw()
 
     def append(self, t, values):
+        """Ajoute un point ; le dessin est differe de quelques ms et regroupe les points recus entre-temps."""
         values = np.atleast_1d(np.asarray(values, float))
         if len(values) > len(self.curves):  # signaux non declares : noms generiques
             self.names = self.names + [f"{self._title.split()[0].lower()}{i}" for i in range(len(self.names), len(values))]
             self._rebuild()
-        self.t.append(t)
-        self.rows.append(values)
-        self._redraw()
+        if len(values) > self._width:
+            self._y = np.hstack([self._y, np.full((len(self._y), len(values) - self._width), np.nan)])
+            self._width = len(values)
+        if self._n == len(self._t):
+            self._t = np.concatenate([self._t, np.empty(len(self._t))])
+            self._y = np.vstack([self._y, np.full((len(self._y), self._width), np.nan)])
+        self._t[self._n] = t
+        self._y[self._n, :] = np.nan
+        self._y[self._n, :len(values)] = values
+        self._n += 1
+        if not self._timer.isActive():
+            self._timer.start()
 
     def set_normalized(self, flag):
         self.normalized = bool(flag)
         self._redraw()
 
     def _redraw(self):
-        if not self.rows:
+        self._timer.stop()
+        if not self._n:
             for c in self.curves:
                 c.setData([], [])
             return
-        width = max(len(r) for r in self.rows)
-        arr = np.array([np.pad(r, (0, width - len(r)), constant_values=np.nan) for r in self.rows])
+        arr = self._y[:self._n, :self._width]
         if self.normalized:
             scale = np.nanmax(np.abs(arr), axis=0)
             arr = arr / np.where(scale > 1e-12, scale, 1.0)
+        t, arr = decimate(self._t[:self._n], arr)
         for i, c in enumerate(self.curves):
             if i < arr.shape[1]:
-                c.setData(self.t, arr[:, i])
+                c.setData(t, arr[:, i])
+        # plus il y a de points, plus on espace les dessins (le rafraichissement reste fluide sur de longs episodes)
+        self._timer.setInterval(min(250, max(REDRAW_MS, self._n // 100)))
 
     def _set_visible(self, name, visible):
         self.hidden.discard(name) if visible else self.hidden.add(name)

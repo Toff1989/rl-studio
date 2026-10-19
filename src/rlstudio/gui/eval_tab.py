@@ -82,6 +82,7 @@ class EvalTab(QWidget):
         self.logbox = QPlainTextEdit()
         self.logbox.setObjectName("mono")
         self.logbox.setReadOnly(True)
+        self.logbox.setMaximumBlockCount(5000)  # journal borne : il ne ralentit pas l'affichage
         self.logbox.setFixedHeight(80)
 
         lay = QVBoxLayout(self)

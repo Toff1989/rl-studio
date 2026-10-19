@@ -1,7 +1,6 @@
 """Lancement des processus de calcul depuis l'interface (QProcess) : entrainement, explorateur, outils."""
 import json
 import shutil
-import subprocess
 import sys
 from pathlib import Path
 
@@ -90,17 +89,26 @@ class TrainRunner(QObject):
             self._kill()
 
     def _kill(self):
+        """Tue le process sans bloquer l'interface. Sous Windows, `taskkill /T` s'execute d'abord (en arriere-plan) pour
+        tuer l'arbre entier (le python du venv est un lanceur, MATLAB un process fils) : le pere n'est tue qu'apres,
+        sinon les fils deviennent orphelins et ne sont plus retrouves."""
+        if not self.proc or self.proc.state() == QProcess.NotRunning:
+            return
+        self._killed = True
+        pid = self.proc.processId()
+        if sys.platform == "win32" and pid:
+            killer = QProcess(self)
+            killer.setProgram("taskkill")
+            killer.setArguments(["/F", "/T", "/PID", str(pid)])
+            killer.finished.connect(lambda *_: self._hard_kill())
+            killer.errorOccurred.connect(lambda *_: self._hard_kill())
+            killer.start()
+            QTimer.singleShot(5000, self._hard_kill)  # filet de securite si taskkill ne repond pas
+        else:
+            self.proc.kill()
+
+    def _hard_kill(self):
         if self.proc and self.proc.state() != QProcess.NotRunning:
-            self._killed = True
-            pid = self.proc.processId()
-            if sys.platform == "win32" and pid:
-                # tue l'arbre entier (le python du venv est un lanceur, MATLAB un process fils) : taskkill doit finir
-                # avant de tuer le pere, sinon les fils deviennent orphelins et ne sont plus retrouves
-                try:
-                    subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)], stdout=subprocess.DEVNULL,
-                                   stderr=subprocess.DEVNULL, creationflags=0x08000000, timeout=5)
-                except (OSError, subprocess.SubprocessError):
-                    pass
             self.proc.kill()
 
     def _on_output(self):
