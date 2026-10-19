@@ -6,6 +6,12 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.3.3] - 2026-10-19
+
+### Corrigé
+- **Installation des composants de calcul** : pip ne bascule plus en installation « --user » (erreur « User site-packages are disabled for this Python ») sur les postes où le site utilisateur est désactivé. `Lib\site-packages` est créé d'avance et l'environnement de pip est isolé (variables `PIP_*` héritées supprimées, `PIP_USER=0`, configuration pip ignorée).
+- **Construction de l'installateur** (`packaging/build.ps1`) : la configuration pip de la machine est écartée et l'erreur réelle de pip s'affiche ; nettoyage robuste de `dist` et `build` (arrêt des instances en cours, réessais, message clair si un dossier est verrouillé par OneDrive ou l'antivirus).
+
 ## [0.3.2] - 2026-10-17
 
 ### Ajouté
