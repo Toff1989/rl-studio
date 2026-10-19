@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.3.3-4f7cf0">
+  <img alt="version" src="https://img.shields.io/badge/version-0.3.4-4f7cf0">
   <img alt="licence MIT" src="https://img.shields.io/badge/licence-MIT-3ecf8e">
   <img alt="Python 3.12" src="https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white">
   <img alt="Windows" src="https://img.shields.io/badge/plateforme-Windows-0078D6?logo=windows&logoColor=white">

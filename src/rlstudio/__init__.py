@@ -1,5 +1,5 @@
 """RL Studio. Imports paresseux : `rlstudio.hardware` doit rester utilisable sans yaml (installateur)."""
-__version__ = "0.3.3"
+__version__ = "0.3.4"
 
 __all__ = ["Project", "ProjectStore"]
 

@@ -1,0 +1,18 @@
+template_name: PAC air/eau - regulation d'une zone
+template_description: "Chauffage d'un batiment par pompe a chaleur : modele thermique RC (air + masse), COP et capacite dependant de la meteo, consigne jour/nuit. Compromis confort / consommation electrique. Environnement Python autonome."
+name: PAC - zone chauffee
+description: Tenir la consigne de temperature en minimisant l'energie electrique de la pompe a chaleur (anticipation de la meteo et du passage nuit/jour).
+kind: python
+env:
+  entry: env.py:make_env
+  params:
+    max_steps: 576        # duree d'un episode (pas de 5 min : 576 = 2 jours)
+    energy_weight: 3.0    # poids de l'energie [kWh] face au confort (augmenter pour economiser davantage)
+    min_modulation: 0.2   # en dessous, le compresseur s'arrete
+algo:
+  name: SAC
+  total_timesteps: 100000
+  seed: 0
+  device: cpu
+  baseline_episodes: 3
+  kwargs: {}

@@ -6,8 +6,11 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.3.4] - 2026-10-19
+
 ### Ajouté
 - **Modèle mathématique** : nouvelle famille **Polynôme** (degrés 2 et 3 par défaut, termes croisés inclus, régression régularisée sur les observations normalisées). Équations lisibles, export Python / MATLAB / Simulink, sauvegarde JSON, option `poly_degrees` et CLI `--methods polynomial`.
+- **Trois modèles de projet CVC / bâtiment** (Python autonome, avec régulateur de référence) : *PAC air/eau – régulation d'une zone* (modèle RC air + masse, COP et capacité selon la météo, consigne jour/nuit), *Ventilation à la demande (CO₂)* (occupation variable, coût ventilateur + chauffage de l'air neuf) et *Ballon d'ECS – tarif et photovoltaïque* (heures pleines/creuses, PV, soutirages aléatoires).
 
 ## [0.3.3] - 2026-10-19
 

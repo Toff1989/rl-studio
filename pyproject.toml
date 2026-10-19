@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rlstudio"
-version = "0.3.3"
+version = "0.3.4"
 description = "Studio de gestion de projets d apprentissage par renforcement (Python + Simulink)"
 requires-python = ">=3.10,<3.13"
 license = {text = "MIT"}

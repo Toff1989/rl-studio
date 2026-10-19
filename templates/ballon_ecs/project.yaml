@@ -1,0 +1,17 @@
+template_name: Ballon d'ECS - tarif et photovoltaique
+template_description: "Ballon d'eau chaude sanitaire de 300 L chauffe par PAC : tarif heures pleines/creuses, production photovoltaique et soutirages aleatoires. Reference : contacteur heures creuses. Environnement Python autonome."
+name: Ballon ECS
+description: Garder l'eau chaude disponible au moindre cout en decalant la chauffe vers les heures creuses et le soleil.
+kind: python
+env:
+  entry: env.py:make_env
+  params:
+    max_steps: 192        # duree d'un episode (pas de 15 min : 192 = 2 jours)
+    pv_peak_w: 1500.0     # puissance crete photovoltaique [W] (0 pour desactiver)
+algo:
+  name: SAC
+  total_timesteps: 60000
+  seed: 0
+  device: cpu
+  baseline_episodes: 3
+  kwargs: {}
