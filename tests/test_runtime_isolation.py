@@ -1,4 +1,5 @@
 """Le runtime embarque ne doit jamais voir (ni modifier) les paquets du site-packages utilisateur."""
+import os
 import subprocess
 import sys
 
@@ -27,8 +28,12 @@ def test_sitecustomize_strips_user_site(tmp_path):
 def test_pip_environment_is_isolated(monkeypatch):
     monkeypatch.setenv("PYTHONPATH", "C:\\ailleurs")
     monkeypatch.setenv("PYTHONHOME", "C:\\autre")
+    monkeypatch.setenv("PIP_USER", "true")
+    monkeypatch.setenv("PIP_INDEX_URL", "https://example.invalid/simple")
     env = components.isolated_env()
     assert env["PYTHONNOUSERSITE"] == "1" and "PYTHONPATH" not in env and "PYTHONHOME" not in env
+    assert env["PIP_USER"] == "0" and env["PIP_CONFIG_FILE"] == os.devnull
+    assert "PIP_INDEX_URL" not in env
 
 
 def test_worker_environment_disables_user_site(tmp_path):
