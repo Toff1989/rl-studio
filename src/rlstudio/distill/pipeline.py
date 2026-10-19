@@ -11,10 +11,10 @@ from .. import __version__
 from ..envs.loader import make_env
 from . import collect, export
 from .policy import load_expert
-from .surrogates import (NeuralSurrogate, Surrogate, fit_linear, fit_symbolic, fit_table, fit_tree, r_squared)
+from .surrogates import (NeuralSurrogate, Surrogate, fit_linear, fit_polynomial, fit_symbolic, fit_table, fit_tree, r_squared)
 
-METHODS = ("linear", "table", "tree", "symbolic", "neural")
-METHOD_LABELS = {"linear": "Lineaire / PID", "table": "Table de gains", "tree": "Arbre de decision",
+METHODS = ("linear", "polynomial", "table", "tree", "symbolic", "neural")
+METHOD_LABELS = {"linear": "Lineaire / PID", "polynomial": "Polynome", "table": "Table de gains", "tree": "Arbre de decision",
                  "symbolic": "Equation symbolique", "neural": "Reseau exact"}
 
 
@@ -28,6 +28,7 @@ class DistillOptions:
     eval_episodes: int = 10       # episodes d'evaluation en boucle fermee, par modele
     margin: float = 0.05          # un modele est « suffisant » s'il atteint (1 - margin) du score de la politique apprise
     tree_depths: tuple = (3, 5, 8)
+    poly_degrees: tuple = (2, 3)
     symbolic_terms: tuple = (3, 6, 12)
     table_dims: int = 2
     integrators: tuple = ()       # observations a integrer (action integrale d'un PID)
@@ -79,7 +80,7 @@ def _run(project, run_dir, opts, env, log, progress, should_stop):
     log(f"Politique chargee : {expert.algo}, {n_obs} observations, {n_act} action(s).")
 
     families = [m for m in opts.methods]
-    n_final = {"linear": 1, "table": 1, "tree": len(opts.tree_depths), "symbolic": len(opts.symbolic_terms), "neural": 1}
+    n_final = {"linear": 1, "polynomial": len(opts.poly_degrees), "table": 1, "tree": len(opts.tree_depths), "symbolic": len(opts.symbolic_terms), "neural": 1}
     n_rand = min(opts.eval_episodes, 5)
     # unite de travail = un episode simule (c'est ce qui prend du temps) ; les ajustements sont quasi instantanes
     total = n_rand + opts.eval_episodes + opts.episodes + sum(
@@ -120,12 +121,14 @@ def _run(project, run_dir, opts, env, log, progress, should_stop):
 
     fit_for_dagger = {
         "linear": lambda d: fit_linear(d, integrators=opts.integrators, dt=dt),
+        "polynomial": lambda d: fit_polynomial(d, degree=mid(opts.poly_degrees)),
         "table": lambda d: fit_table(d, k_dims=opts.table_dims),
         "tree": lambda d: fit_tree(d, max_depth=mid(opts.tree_depths), min_leaf=leaf(len(d))),
         "symbolic": lambda d: fit_symbolic(d, (mid(opts.symbolic_terms),))[mid(opts.symbolic_terms)],
     }
     finals = {
         "linear": lambda d: [("linear", fit_linear(d, integrators=opts.integrators, dt=dt))],
+        "polynomial": lambda d: [(f"poly-d{k}", fit_polynomial(d, degree=k)) for k in opts.poly_degrees],
         "table": lambda d: [("table", fit_table(d, k_dims=opts.table_dims))],
         "tree": lambda d: [(f"tree-d{k}", fit_tree(d, max_depth=k, min_leaf=leaf(len(d)))) for k in opts.tree_depths],
         "symbolic": lambda d: [(f"symbolic-k{k}", s) for k, s in fit_symbolic(d, opts.symbolic_terms).items()],

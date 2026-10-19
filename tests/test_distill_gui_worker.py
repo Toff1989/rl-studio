@@ -71,7 +71,7 @@ def test_distill_tab_loads_and_shows_report(trained, tmp_path):
     assert tab.run_combo.count() >= 1 and tab.report is not None
     assert tab.table.rowCount() == 3
     assert tab._candidate() is not None and tab.equations.toPlainText()
-    assert tab.options()["methods"] == ["linear", "table", "tree", "symbolic", "neural"]
+    assert tab.options()["methods"] == ["linear", "polynomial", "table", "tree", "symbolic", "neural"]
     tab.restyle()
     app.processEvents()
     tab.deleteLater()

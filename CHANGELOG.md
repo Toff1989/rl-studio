@@ -6,6 +6,9 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+### Ajouté
+- **Modèle mathématique** : nouvelle famille **Polynôme** (degrés 2 et 3 par défaut, termes croisés inclus, régression régularisée sur les observations normalisées). Équations lisibles, export Python / MATLAB / Simulink, sauvegarde JSON, option `poly_degrees` et CLI `--methods polynomial`.
+
 ## [0.3.3] - 2026-10-19
 
 ### Corrigé

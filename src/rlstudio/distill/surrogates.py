@@ -1,4 +1,4 @@
-"""Modeles simples (substituts) d'une politique : lineaire / PID, table, arbre, symbolique, reseau exact.
+"""Modeles simples (substituts) d'une politique : lineaire / PID, polynome, table, arbre, symbolique, reseau exact.
 
 Tous sont en NumPy pur. Chacun sait : predire, decrire ses equations, se generer en code Python et MATLAB
 (compatible generation de code), et se serialiser en JSON.
@@ -7,6 +7,7 @@ Convention : une politique est une fonction  observations (d,) -> actions (m,), 
 """
 from __future__ import annotations
 
+import itertools
 import re
 
 import warnings
@@ -14,9 +15,11 @@ import warnings
 import numpy as np
 
 PY_RESERVED = {"u", "obs", "np", "LOW", "HIGH", "policy", "integ", "DT", "if", "else", "for", "while", "def", "class",
-               "import", "lambda", "None", "True", "False", "return", "in", "is", "not", "and", "or"}
+               "import", "lambda", "None", "True", "False", "return", "in", "is", "not", "and", "or",
+               "PE", "PC", "PB", "PMU", "PSD", "pz", "pf"}
 M_RESERVED = {"u", "obs", "LOW", "HIGH", "integ", "DT", "fcn", "policy", "if", "else", "elseif", "end", "for", "while",
-              "function", "return", "pi", "i", "j", "eps", "inf", "nan", "sin", "cos", "tanh", "abs", "min", "max"}
+              "function", "return", "pi", "i", "j", "eps", "inf", "nan", "sin", "cos", "tanh", "abs", "min", "max",
+              "PE", "PC", "PB", "PMU", "PSD", "pz", "pf"}
 
 
 def clean_names(names, reserved):
@@ -264,6 +267,114 @@ def fit_linear(data, ridge=1e-8, integrators=(), dt=1.0, label="") -> LinearSurr
     d = len(names)
     return LinearSurrogate(names, data.act_names, data.low, data.high, W=coef[:d].T, b=coef[-1], integ_idx=idx,
                            Wi=coef[d:-1].T if idx else None, dt=dt, label=label)
+
+
+# ================================================================================================
+#  Polynomial : u = b + somme des monomes (produits des observations normalisees) jusqu'au degre D
+# ================================================================================================
+def _exponents(d, degree):
+    """Exposants de tous les monomes de degre 1..degree (hors constante) en d variables, ordre croissant de degre."""
+    rows = []
+    for deg in range(1, degree + 1):
+        for combo in itertools.combinations_with_replacement(range(d), deg):
+            e = np.zeros(d, int)
+            for i in combo:
+                e[i] += 1
+            rows.append(e)
+    return np.array(rows, int).reshape(-1, d)
+
+
+def _monomials(Z, E):
+    """Matrice (n, nombre de monomes) des produits prod_i Z[:, i] ** E[t, i]."""
+    n = len(Z)
+    F = np.ones((n, len(E)))
+    top = int(E.max()) if E.size else 0
+    for i in range(E.shape[1]):
+        powers = Z[:, i, None] ** np.arange(top + 1)  # (n, top + 1)
+        F *= powers[:, E[:, i]]
+    return F
+
+
+class PolynomialSurrogate(Surrogate):
+    """u = b + C . monomes(z), z = (obs - mu) / sd : polynome multivarie (termes croises inclus) de degre `degree`."""
+
+    kind = "polynomial"
+
+    def __init__(self, obs_names, act_names, low, high, degree, mu, sd, E, C, b, label=""):
+        super().__init__(obs_names, act_names, low, high, label or f"Polynome de degre {int(degree)}")
+        self.degree = int(degree)
+        self.mu, self.sd = np.asarray(mu, float).ravel(), np.asarray(sd, float).ravel()
+        self.E = np.asarray(E, int).reshape(-1, len(self.mu))
+        self.C = np.asarray(C, float).reshape(len(np.atleast_1d(b)), -1)
+        self.b = np.asarray(b, float).ravel()
+
+    @property
+    def complexity(self):
+        return int(self.C.size + self.b.size)
+
+    def raw(self, X):
+        Z = (np.asarray(X, float) - self.mu) / self.sd
+        return _monomials(Z, self.E) @ self.C.T + self.b
+
+    def _term(self, t, names, lang):
+        py = lang == "py"
+        parts = []
+        for i, e in enumerate(self.E[t]):
+            if e == 1:
+                parts.append(names[i])
+            elif e > 1:
+                parts.append(f"{names[i]}**{e}" if py else f"{names[i]}^{e}")
+        return "*".join(parts)
+
+    def equations(self):
+        zn = [f"z_{n}" for n in self.obs_names]
+        head = [f"z_{n} = ({n} - {m:.4g}) / {s:.4g}" for n, m, s in zip(self.obs_names, self.mu, self.sd)]
+        eqs = []
+        for k, a in enumerate(self.act_names):
+            order = [t for t in np.argsort(-np.abs(self.C[k])) if abs(self.C[k, t]) > 1e-12][:40]
+            terms = [f"{self.C[k, t]:+.4g}*{self._term(t, zn, 'py')}" for t in sorted(order)]
+            more = int(np.count_nonzero(np.abs(self.C[k]) > 1e-12)) - len(order)
+            eqs.append(f"{a} = {self.b[k]:.4g} " + " ".join(terms) + (f" ... (+{more} termes)" if more > 0 else "")
+                       + f"   (borne a [{self.low[k]:.4g}, {self.high[k]:.4g}])")
+        return head + eqs
+
+    def title(self):
+        return f"{self.label} ({self.E.shape[0]} monomes)"
+
+    def code(self, lang, v):
+        py = lang == "py"
+        if py:
+            consts = [f"PMU = {vec_py(self.mu)}", f"PSD = {vec_py(self.sd)}", f"PE = {mat_py(self.E)}", f"PC = {mat_py(self.C)}", f"PB = {vec_py(self.b)}"]
+            body = [f"pz = (np.array([{', '.join(v)}]) - PMU) / PSD", "pf = np.prod(pz ** PE, axis=1)", "u[:] = PC @ pf + PB"]
+        else:
+            consts = [f"PMU = {vec_m(self.mu)};", f"PSD = {vec_m(self.sd)};", f"PE = {mat_m(self.E)};", f"PC = {mat_m(self.C)};", f"PB = {vec_m(self.b)};"]
+            body = [f"pz = ([{'; '.join(v)}] - PMU) ./ PSD;", f"pf = prod(repmat(pz', {self.E.shape[0]}, 1) .^ PE, 2);", "u = PC * pf + PB;"]
+        return consts, body
+
+    def to_dict(self):
+        d = self._base_dict()
+        d.update(degree=self.degree, mu=_arr(self.mu), sd=_arr(self.sd), E=self.E.tolist(), C=_arr(self.C), b=_arr(self.b))
+        return d
+
+
+def fit_polynomial(data, degree=2, ridge=1e-6, max_terms=400, label="") -> PolynomialSurrogate:
+    """Moindres carres regularises sur les monomes des observations normalisees. Si le nombre de monomes depasse
+    `max_terms`, le degre est abaisse (jamais sous 1) pour garder un modele exportable."""
+    X, Y = data.observations(), data.actions()
+    d = X.shape[1]
+    degree = max(1, int(degree))
+    while degree > 1 and len(_exponents(d, degree)) > max_terms:
+        degree -= 1
+    mu = X.mean(0)
+    sd = np.where(X.std(0) > 1e-9, X.std(0), 1.0)
+    E = _exponents(d, degree)
+    F = _monomials((X - mu) / sd, E)
+    fm, ym = F.mean(0), Y.mean(0)
+    Fc, Yc = F - fm, Y - ym
+    A = Fc.T @ Fc / len(F) + ridge * np.eye(F.shape[1])
+    coef = np.linalg.solve(A, Fc.T @ Yc / len(F))  # (nombre de monomes, m)
+    b = ym - fm @ coef
+    return PolynomialSurrogate(data.obs_names, data.act_names, data.low, data.high, degree, mu, sd, E, coef.T, b, label=label)
 
 
 # ================================================================================================
@@ -711,6 +822,8 @@ def surrogate_from_dict(d: dict) -> Surrogate:
     kind, label = d["kind"], d.get("label", "")
     if kind == "linear":
         return LinearSurrogate(*common, W=d["W"], b=d["b"], integ_idx=d.get("integ_idx", ()), Wi=d.get("Wi"), dt=d.get("dt", 1.0), label=label)
+    if kind == "polynomial":
+        return PolynomialSurrogate(*common, d["degree"], d["mu"], d["sd"], d["E"], d["C"], d["b"], label=label)
     if kind == "tree":
         return TreeSurrogate(*common, d["feat"], d["thr"], d["left"], d["right"], d["value"], label=label)
     if kind == "table":

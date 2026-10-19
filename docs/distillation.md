@@ -22,6 +22,7 @@ décision, équation — que l'on peut relire, valider, et embarquer ailleurs (P
 | Famille | Forme | Quand |
 |---|---|---|
 | Linéaire / PID | `u = K·x + b`, avec action intégrale optionnelle (observations à intégrer) | systèmes proches d'un régulateur classique |
+| Polynôme | `u = b + Σ c·z₁^a·z₂^b…` sur les observations normalisées, termes croisés inclus (degrés 2 et 3, abaissés si plus de 400 monomes) | non-linéarités lisses et couplages entre variables |
 | Table de gains | interpolation 1D/2D sur les observations les plus influentes | non-linéarités douces, gain programmé |
 | Arbre de décision | règles `si x < seuil alors …` (profondeurs 3, 5, 8) | actions par paliers, saturation, commutations |
 | Équation symbolique | somme parcimonieuse de termes (`x`, `x²`, `sin`, `tanh`, produits…), 3 / 6 / 12 termes | loi compacte et lisible |

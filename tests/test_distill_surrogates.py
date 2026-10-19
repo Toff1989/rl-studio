@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 
 from rlstudio.distill.collect import Dataset
-from rlstudio.distill.surrogates import (fit_linear, fit_symbolic, fit_table, fit_tree, r_squared, surrogate_from_dict)
+from rlstudio.distill.surrogates import (fit_linear, fit_polynomial, fit_symbolic, fit_table, fit_tree, r_squared, surrogate_from_dict)
 
 
 def make_data(fn, n_eps=6, length=120, dim=3, seed=0):
@@ -47,10 +47,23 @@ def test_tree_table_symbolic_fit_nonlinear():
     assert sym[6].complexity <= sym[12].complexity
 
 
-@pytest.mark.parametrize("kind", ["linear", "tree", "table", "symbolic"])
+def test_polynomial_recovers_cross_terms_and_caps_degree():
+    fn = lambda o: 0.3 * o[:, 0] * o[:, 1] - 0.4 * o[:, 2] ** 2 + 0.2  # noqa: E731
+    d = make_data(fn, n_eps=8, length=150)
+    lin = fit_linear(d)
+    poly = fit_polynomial(d, degree=2)
+    obs = d.obs_episodes()
+    assert r_squared(d.actions(), poly.predict_episodes(obs)) > 0.99
+    assert r_squared(d.actions(), poly.predict_episodes(obs)) > r_squared(d.actions(), lin.predict_episodes(obs)) + 0.2
+    assert poly.E.shape[0] == 9  # 3 + 6 monomes de degre 1 et 2 en 3 variables
+    # trop de monomes : le degre est abaisse plutot que d'exporter un modele enorme
+    assert fit_polynomial(d, degree=6, max_terms=20).degree < 6
+
+
+@pytest.mark.parametrize("kind", ["linear", "polynomial", "tree", "table", "symbolic"])
 def test_json_roundtrip_and_python_export_match(kind):
     d = make_data(lambda o: np.tanh(o[:, 0]) - 0.3 * o[:, 2], n_eps=5)
-    s = {"linear": lambda: fit_linear(d), "tree": lambda: fit_tree(d, max_depth=4, min_leaf=3),
+    s = {"linear": lambda: fit_linear(d), "polynomial": lambda: fit_polynomial(d, degree=3), "tree": lambda: fit_tree(d, max_depth=4, min_leaf=3),
          "table": lambda: fit_table(d, k_dims=2), "symbolic": lambda: fit_symbolic(d, (6,))[6]}[kind]()
     s2 = surrogate_from_dict(s.to_dict())
     obs = d.observations()[:50]
@@ -81,7 +94,7 @@ def test_generated_matlab_and_simulink_match_python(tmp_path):
     from rlstudio.envs.simulink import MatlabSession
 
     d = make_data(lambda o: np.tanh(o[:, 0]) - 0.3 * o[:, 2] + 0.2 * o[:, 1] ** 2, n_eps=6, length=150)
-    models = {"m_linear": fit_linear(d), "m_tree": fit_tree(d, max_depth=4, min_leaf=3), "m_table": fit_table(d, k_dims=2),
+    models = {"m_linear": fit_linear(d), "m_poly": fit_polynomial(d, degree=3), "m_tree": fit_tree(d, max_depth=4, min_leaf=3), "m_table": fit_table(d, k_dims=2),
               "m_sym": fit_symbolic(d, (6,))[6]}
     obs = d.observations()[:12]
     session = MatlabSession()
