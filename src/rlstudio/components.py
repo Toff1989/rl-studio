@@ -122,8 +122,13 @@ if _lib and _lib not in sys.path:
 
 
 def isolated_env(extra=None) -> dict:
-    env = {k: v for k, v in os.environ.items() if k not in ("PYTHONPATH", "PYTHONHOME", "PYTHONSTARTUP")}
+    env = {k: v for k, v in os.environ.items()
+           if k not in ("PYTHONPATH", "PYTHONHOME", "PYTHONSTARTUP") and not k.startswith("PIP_")}
     env["PYTHONNOUSERSITE"] = "1"
+    # Site utilisateur desactive : pip ne doit jamais basculer en « --user » (erreur « User site-packages are
+    # disabled »), ni lire une configuration pip utilisateur/globale qui l'y forcerait.
+    env["PIP_USER"] = "0"
+    env["PIP_CONFIG_FILE"] = os.devnull
     env.update(extra or {})
     return env
 
@@ -156,6 +161,7 @@ def create_runtime(runtime_dir: Path, log, vendor_dir=None) -> tuple[Path, str]:
             if "Lib\\site-packages" not in text:
                 text = text.rstrip() + "\nLib\\site-packages\n"
             pth.write_text(text, encoding="utf-8")
+        (target / "Lib" / "site-packages").mkdir(parents=True, exist_ok=True)  # sinon pip croit devoir installer en --user
         (target / "sitecustomize.py").write_text(SITECUSTOMIZE, encoding="utf-8")
         py = target / "python.exe"
         if _stream([py, "-m", "pip", "--version"], lambda _l: None) != 0:
