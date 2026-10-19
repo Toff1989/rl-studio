@@ -62,7 +62,19 @@ Pip-Install "pip install -e ." @("--no-deps", "-e", ".")
 
 # 2. icone et PyInstaller
 if (-not (Test-Path "packaging\icon.ico")) { & $py packaging\make_icon.py }
-Remove-Item -Recurse -Force dist, build -ErrorAction SilentlyContinue
+# Nettoyage robuste : une instance de RL Studio lancee depuis dist\, OneDrive (synchronisation) ou l'antivirus
+# verrouillent des fichiers -> « Acces refuse ». On arrete les instances, on reessaie, puis on echoue clairement.
+Get-Process rlstudio, rlstudio-tools, rlstudio-scan -ErrorAction SilentlyContinue | Stop-Process -Force
+foreach ($d in "dist", "build") {
+  for ($i = 1; (Test-Path $d) -and $i -le 5; $i++) {
+    Get-ChildItem $d -Recurse -Force -ErrorAction SilentlyContinue | ForEach-Object { try { $_.Attributes = "Normal" } catch { } }
+    Remove-Item -Recurse -Force $d -ErrorAction SilentlyContinue
+    if (Test-Path $d) { Start-Sleep -Seconds 2 }
+  }
+  if (Test-Path $d) {
+    throw "Impossible de supprimer '$d' (verrouille). Ferme RL Studio / l'Explorateur sur ce dossier, mets le depot hors OneDrive (ou clic droit > Toujours conserver sur cet appareil, ou suspends la synchro), puis relance."
+  }
+}
 & $py -m PyInstaller packaging\rlstudio.spec --noconfirm --distpath dist --workpath build\spec
 Check "PyInstaller (application)"
 & $py -m PyInstaller --onefile --console --name rlstudio-scan --icon "$root\packaging\icon.ico" `
