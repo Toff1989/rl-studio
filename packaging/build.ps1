@@ -42,9 +42,23 @@ $py = ".buildvenv\Scripts\python.exe"
 # que si ce dossier est dans le PATH. Un Python python.org n'en a pas besoin (recommande).
 $base = (& $py -c "import sys; print(sys.base_prefix)")
 if (Test-Path "$base\Library\bin") { $env:PATH = "$base\Library\bin;$env:PATH"; Write-Host "Python conda detecte : PATH complete." }
-& $py -m pip install --quiet --upgrade pip 2>$null
-& $py -m pip install --quiet -r packaging\requirements-gui.txt 2>$null; Check "pip (dependances de build)"
-& $py -m pip install --quiet --no-deps -e . 2>$null; Check "pip install -e ."
+# pip du venv de build : on ecarte toute configuration pip de la machine (PIP_USER, PIP_REQUIRE_VIRTUALENV,
+# pip.ini utilisateur...) et on affiche la sortie (sinon l'erreur reelle est masquee).
+Get-ChildItem Env: | Where-Object { $_.Name -like "PIP_*" } | ForEach-Object { Remove-Item "Env:$($_.Name)" }
+$env:PIP_USER = "0"
+$env:PIP_CONFIG_FILE = "NUL"
+$env:PYTHONNOUSERSITE = "1"
+$env:PIP_DISABLE_PIP_VERSION_CHECK = "1"
+function Pip-Install($what, [string[]]$pipArgs) {
+  $out = & $py -m pip install @pipArgs 2>&1 | ForEach-Object { "$_" }
+  $code = $LASTEXITCODE
+  if ($code -ne 0) { $out | ForEach-Object { Write-Host $_ } }
+  $global:LASTEXITCODE = $code
+  Check $what
+}
+& $py -m pip install --quiet --upgrade pip 2>&1 | Out-Null   # non bloquant
+Pip-Install "pip (dependances de build)" @("-r", "packaging\requirements-gui.txt")
+Pip-Install "pip install -e ." @("--no-deps", "-e", ".")
 
 # 2. icone et PyInstaller
 if (-not (Test-Path "packaging\icon.ico")) { & $py packaging\make_icon.py }
