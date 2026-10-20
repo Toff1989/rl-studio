@@ -59,7 +59,12 @@ def test_options_reflect_ui(tab):
     assert o["poly_degrees"] == [2, 4] and "neural" not in o["methods"] and t.out_list.item(0).text() not in o["outputs"]
     t.in_table.item(0, 0).setCheckState(Qt.Unchecked)
     t.in_table.item(0, 4).setText("0.25")
-    assert t.options()["fixed"] == {name: 0.25} or t.in_table.rowCount() == 1
+    if t.in_table.rowCount() == 1:  # tout fixe : rien a balayer
+        with pytest.raises(ValueError):
+            t.options()
+        t.in_table.item(0, 0).setCheckState(Qt.Checked)
+    else:
+        assert t.options()["fixed"] == {name: 0.25}
     t.mode.setCurrentIndex(1)
     d = t.options()
     assert d["mode"] == "dynamic" and "episodes" in d and "samples" not in d and "outputs" not in d
@@ -96,12 +101,12 @@ def test_loads_steady_and_dynamic_reports(tab):
                  out_dir=base / "20260102-100000", log=lambda m: None)
     t.set_project(project)
     assert t.result_combo.count() == 2
-    assert not t._steady() and t.table.rowCount() == 3 and "Fidelite" in t.table.horizontalHeaderItem(3).text()
+    assert not t._steady() and t.table.rowCount() == 2 and "Fidelite" in t.table.horizontalHeaderItem(3).text()
     assert t._candidate() is not None and t.equations.toPlainText()
     t.restyle()
     app.processEvents()
     t.result_combo.setCurrentIndex(1)
     assert t._steady() and t.table.rowCount() == 2 and t.plot_out.count() == 2 and t.plot_out.isVisibleTo(t) is True
     t.table.selectRow(1)
-    assert "y1" in t.equations.toPlainText() or "y2" in t.equations.toPlainText() or "teta" not in ""
+    assert "y1 = " in t.equations.toPlainText() or "y2 = " in t.equations.toPlainText()
     app.processEvents()
