@@ -1,5 +1,21 @@
 # Identifier un modele reduit sans politique : regime permanent (defaut) ou dynamique
 
+## Interface : onglet **Identification**
+
+Tout se parametre dans l'onglet (ou en ligne de commande, plus bas) :
+
+- **Mode** : regime permanent ou dynamique ; **familles** de modeles a ajuster.
+- **Entrees** (tableau lu dans le projet ; bouton *Lire les signaux* pour un projet Python) : decocher une entree pour la maintenir a une
+  *valeur fixee* (elle n'est alors plus une entree du modele), ou restreindre sa plage *Min / Max* (dans les bornes de l'action).
+- **Sorties** (regime permanent) : cocher les observations a modeliser.
+- **Balayage** : nombre de points / d'episodes, validation, part aux bornes, criteres de stabilisation (tolerances relative et absolue, pas
+  consecutifs, duree max), perturbations `initial` comme entrees, tours de collecte, duree des paliers (dynamique).
+- **Modeles** : degres du polynome, seuils SINDy, couches cachees et epoques du reseau, tolerance de recommandation, graine.
+- **Resultats** : historique des identifications du projet, tableau comparatif, graphique complexite / fidelite, nuage modele vs systeme (par
+  sortie) ou erreur par horizon, equations, copie / enregistrement en Python ou MATLAB.
+
+Les resultats sont enregistres dans `projects/<projet>/identify/<date>/`.
+
 ## Regime permanent : entrees -> sorties (`rlstudio identify <projet>`)
 
 On ne cherche pas la dynamique, seulement l'**etat stabilise** en fonction des entrees : `y = f(u)`. Le modele (Simulink ou Python) est une

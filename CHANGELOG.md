@@ -7,6 +7,7 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 ## [Non publié]
 
 ### Ajouté
+- **Onglet Identification** : mode (régime permanent / dynamique), familles de modèles, entrées à balayer (plage Min/Max ou valeur fixée), sorties à modéliser, critères de stabilisation, nombre de points ou d'épisodes, perturbations comme entrées, hyperparamètres des modèles ; historique des résultats, graphiques, équations, export Python / MATLAB. Nouvelles commandes du worker `identify` et `env-signals`.
 - **Identification en régime permanent** (`rlstudio identify`, module `rlstudio.identify`) : sans politique ni entraînement, carte statique entrées → sorties `y = f(u)` : hypercube latin sur les entrées, chaque point simulé jusqu'à stabilisation, ajustement (linéaire, polynôme, équations parcimonieuses SINDy avec produits fonction × variable, réseau de neurones), validation sur points neufs, export Python / MATLAB (`steady_state`). Option `--scenario` : les variables `initial` deviennent des entrées.
 - **Identification de dynamique** (`rlstudio identify --mode dynamic`) : sans politique ni entraînement, balayage d'actions et de conditions initiales d'un environnement (Simulink ou Python) → modèle réduit `x(k+1) = x(k) + f(x, u)` linéaire, polynomial, en équations parcimonieuses (SINDy) ou en réseau de neurones (NumPy pur), validé en **simulation libre** sur des épisodes neufs (fidélité, erreur par horizon, courbe d'apprentissage), exporté en Python et MATLAB. Voir `docs/identification.md`.
 

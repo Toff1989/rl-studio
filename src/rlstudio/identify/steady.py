@@ -6,7 +6,7 @@ Plan d'experience (hypercube latin sur les entrees) -> chaque point est simule j
 from __future__ import annotations
 
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 import numpy as np
@@ -35,6 +35,9 @@ class SteadyOptions:
     epochs: int = 400
     margin: float = 0.02          # un modele est « suffisant » si son R2 sur points neufs atteint 1 - margin
     seed: int = 0
+    ranges: dict = field(default_factory=dict)    # {entree: [min, max]} : plage balayee (defaut : bornes de l'action de l'environnement)
+    fixed: dict = field(default_factory=dict)     # {entree: valeur} : entree maintenue constante (non balayee, exclue du modele)
+    outputs: list | None = None                   # sorties a modeliser (defaut : toutes les observations)
 
     @staticmethod
     def from_dict(d):
@@ -51,8 +54,10 @@ def evaluate_static(model, val):
     sd = np.maximum(Y.std(0), 1e-12)
     err = (P - Y) / sd
     per_out = [float(r_squared(Y[:, [k]], P[:, [k]])) for k in range(Y.shape[1])]
+    pick = np.random.default_rng(0).choice(len(Y), min(len(Y), 200), replace=False)
     return {"r2": float(r_squared(Y, P)), "r2_by_output": dict(zip(val.obs_names, per_out)), "nrmse": float(np.sqrt((err ** 2).mean())),
-            "max_abs_err": float(np.abs(err).max())}
+            "max_abs_err": float(np.abs(err).max()),
+            "scatter": {n: np.column_stack([Y[pick, k], P[pick, k]]).round(6).tolist() for k, n in enumerate(val.obs_names)}}
 
 
 def run_steady(project, options: SteadyOptions | None = None, log=print, progress=None, should_stop=None, env=None) -> dict:
@@ -74,7 +79,29 @@ def steady_env(env, opts, name="env", out_dir=None, log=print, progress=None, sh
     progress = progress or _noop
     rng = np.random.default_rng(opts.seed)
     t0 = time.time()
-    low, high = np.asarray(env.action_space.low, float), np.asarray(env.action_space.high, float)
+    env_low, env_high = np.asarray(env.action_space.low, float), np.asarray(env.action_space.high, float)
+    names_a = list(getattr(env, "action_names", None) or [f"u{i}" for i in range(len(env_low))])
+    unknown = [n for n in list(opts.fixed) + list(opts.ranges) if n not in names_a]
+    if unknown:
+        raise ValueError(f"entrees inconnues : {unknown} (actions disponibles : {names_a})")
+    swept = [i for i, n in enumerate(names_a) if n not in opts.fixed]
+    if not swept:
+        raise ValueError("Toutes les entrees sont fixees : il n'y a rien a balayer.")
+    low, high = env_low[swept].copy(), env_high[swept].copy()
+    for j, i in enumerate(swept):
+        if names_a[i] in opts.ranges:
+            a, b = (float(v) for v in opts.ranges[names_a[i]])
+            if not a < b:
+                raise ValueError(f"plage de {names_a[i]} : min doit etre < max ({a} >= {b}).")
+            low[j], high[j] = max(a, env_low[i]), min(b, env_high[i])
+            if not low[j] < high[j]:
+                raise ValueError(f"plage de {names_a[i]} hors des bornes de l'action [{env_low[i]:g}, {env_high[i]:g}].")
+            if (a, b) != (low[j], high[j]):
+                log(f"  plage de {names_a[i]} ramenee aux bornes de l'action : [{low[j]:g}, {high[j]:g}]")
+    base = (env_low + env_high) / 2.0
+    for n, v in opts.fixed.items():
+        i = names_a.index(n)
+        base[i] = float(np.clip(float(v), env_low[i], env_high[i]))
     n_fits = sum({"polynomial": len(opts.poly_degrees), "sparse": len(opts.sparse_thresholds)}.get(m, 1) for m in opts.methods)
     total, done = opts.samples + opts.val_samples + n_fits, [0]
 
@@ -82,12 +109,18 @@ def steady_env(env, opts, name="env", out_dir=None, log=print, progress=None, sh
         done[0] += 1
         progress(stage, min(0.999, done[0] / total))
 
-    kw = dict(rtol=opts.rtol, atol=opts.atol, window=opts.window, max_steps=opts.max_settle_steps, scenario=opts.scenario, should_stop=should_stop)
-    log(f"Regime permanent : {opts.samples} point(s) d'apprentissage + {opts.val_samples} de validation (hypercube latin sur {len(low)} entree(s)) ...")
+    kw = dict(rtol=opts.rtol, atol=opts.atol, window=opts.window, max_steps=opts.max_settle_steps, scenario=opts.scenario, should_stop=should_stop, swept=swept, base=base)
+    log(f"Regime permanent : {opts.samples} point(s) d'apprentissage + {opts.val_samples} de validation (hypercube latin sur {len(low)} entree(s) : {', '.join(names_a[i] for i in swept)}) ...")
     train = collect.steady_sweep(env, collect.latin_hypercube(rng, opts.samples, low, high, opts.extreme), 100 + opts.seed,
                                  on_point=lambda k, n: bump(f"Points d'apprentissage : {k}/{n}"), **kw)
     val = collect.steady_sweep(env, rng.uniform(low, high, (opts.val_samples, len(low))), 900_000 + opts.seed,
                                on_point=lambda k, n: bump(f"Points de validation : {k}/{n}"), **kw)
+    if opts.outputs:
+        bad = [n for n in opts.outputs if n not in train.obs_names]
+        if bad:
+            raise ValueError(f"sorties inconnues : {bad} (observations disponibles : {train.obs_names})")
+        train.select_outputs(opts.outputs)
+        val.select_outputs(opts.outputs)
     dropped = train.dropped + val.dropped
     log(f"  {len(train)} + {len(val)} points stabilises (en moyenne {np.mean(train.steps + val.steps):.1f} pas), {dropped} ecarte(s) faute de convergence")
     if len(train) < 5 or len(val) < 2:

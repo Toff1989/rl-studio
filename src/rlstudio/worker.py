@@ -7,6 +7,8 @@ Protocole : une ligne JSON par evenement sur stdout ; la commande `stop` arrive 
   inspect      --model FILE                      blocs d'un modele Simulink
   matlab-test                                    demarre MATLAB et verifie Simulink
   env-info                                       versions installees (Python, PyTorch, CUDA...)
+  identify     --project DIR [--options JSON]   identifie un modele reduit (regime permanent ou dynamique), sans politique
+  env-signals  --project DIR   actions (bornes) et observations de l'environnement du projet
   evaluate     --project DIR --run NOM [--policy agent|distill:ID]   rejoue des episodes en direct
   distill      --project DIR --run NOM [--options JSON]   extrait un modele mathematique d'un run
   export-simulink --project DIR --run NOM --candidate ID --out FILE   controleur extrait -> modele Simulink
@@ -138,6 +140,48 @@ def cmd_distill(args):
         emit(type="done", stopped=True)
         return
     emit(type="done", stopped=False, recommended=report["recommended"])
+
+
+def cmd_identify(args):
+    from .distill.collect import Stopped
+    from .identify import IdentifyOptions, SteadyOptions, run_identification, run_steady
+    from .project import Project
+
+    project = Project(args.project)
+    raw = json.loads(args.options) if args.options else {}
+    mode = raw.pop("mode", "steady")
+    stop = threading.Event()
+    threading.Thread(target=_listen_for_stop, args=(stop,), daemon=True).start()
+    run = run_steady if mode == "steady" else run_identification
+    options = (SteadyOptions if mode == "steady" else IdentifyOptions).from_dict(raw)
+    try:
+        report = run(project, options, log=lambda m: emit(type="log", text=m),
+                     progress=lambda stage, frac: emit(type="progress", stage=stage, fraction=round(frac, 4)), should_stop=stop.is_set)
+    except Stopped:
+        emit(type="done", stopped=True)
+        return
+    emit(type="done", stopped=False, recommended=report["recommended"], dir=report.get("dir"))
+
+
+def cmd_env_signals(args):
+    from .envs.loader import make_env
+    from .project import Project
+
+    env = make_env(Project(args.project))
+    try:
+        low, high = env.action_space.low.tolist(), env.action_space.high.tolist()
+        names = list(getattr(env, "action_names", None) or [f"u{i}" for i in range(len(low))])
+        obs = list(getattr(env, "obs_names", None) or [f"x{i}" for i in range(int(env.observation_space.shape[0]))])
+        emit(type="result", actions=[{"name": n, "low": lo, "high": hi} for n, lo, hi in zip(names, low, high)], observations=obs,
+             step_s=getattr(env, "step_s", None), episode_s=getattr(env, "episode_s", None) or (
+                 getattr(env, "n_steps", 0) * float(getattr(env, "step_s", 1.0) or 1.0) or None),
+             initial=[i["variable"] for i in (project_initial(env))])
+    finally:
+        env.close()
+
+
+def project_initial(env):
+    return list(getattr(env, "sim_spec", {}).get("initial", []) or [])
 
 
 def cmd_export_simulink(args):
@@ -320,6 +364,11 @@ def main(argv=None):
     p.add_argument("--project", required=True)
     p.add_argument("--run", required=True)
     p.add_argument("--options")
+    p = sub.add_parser("identify")
+    p.add_argument("--project", required=True)
+    p.add_argument("--options")
+    p = sub.add_parser("env-signals")
+    p.add_argument("--project", required=True)
     p = sub.add_parser("evaluate")
     p.add_argument("--project", required=True)
     p.add_argument("--run", required=True)
@@ -335,7 +384,7 @@ def main(argv=None):
     args = ap.parse_args(argv)
     handlers = {"train": cmd_train, "inspect": cmd_inspect, "matlab-test": cmd_matlab_test, "env-info": cmd_env_info,
                 "analyze-model": cmd_analyze_model, "convert-model": cmd_convert_model,
-                "distill": cmd_distill, "evaluate": cmd_evaluate, "export-simulink": cmd_export_simulink}
+                "distill": cmd_distill, "identify": cmd_identify, "env-signals": cmd_env_signals, "evaluate": cmd_evaluate, "export-simulink": cmd_export_simulink}
     try:
         handlers[args.cmd](args)
     except Exception as e:

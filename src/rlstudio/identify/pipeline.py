@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import json
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 import numpy as np
@@ -39,6 +39,8 @@ class IdentifyOptions:
     margin: float = 0.05          # un modele est « suffisant » si sa fidelite en simulation libre atteint 1 - margin
     seed: int = 0
     max_steps: int | None = None
+    ranges: dict = field(default_factory=dict)    # {action: [min, max]} : plage balayee
+    fixed: dict = field(default_factory=dict)     # {action: valeur} : action maintenue constante
 
     @staticmethod
     def from_dict(d: dict | None) -> "IdentifyOptions":
@@ -116,7 +118,21 @@ def identify_env(env, opts, name="env", out_dir=None, log=print, progress=None, 
         done[0] += n
         progress(stage, min(0.999, done[0] / max(total, 1)))
 
-    sweep_kw = dict(hold_max=opts.hold_max, extreme=opts.extreme, max_steps=opts.max_steps, should_stop=should_stop, action_fn=action_fn)
+    env_low, env_high = np.asarray(env.action_space.low, float), np.asarray(env.action_space.high, float)
+    names_a = list(getattr(env, "action_names", None) or [f"u{i}" for i in range(len(env_low))])
+    unknown = [n for n in list(opts.fixed) + list(opts.ranges) if n not in names_a]
+    if unknown:
+        raise ValueError(f"actions inconnues : {unknown} (disponibles : {names_a})")
+    low, high = env_low.copy(), env_high.copy()
+    for i, n in enumerate(names_a):
+        if n in opts.ranges:
+            a, b = (float(v) for v in opts.ranges[n])
+            low[i], high[i] = max(a, env_low[i]), min(b, env_high[i])
+            if not low[i] < high[i]:
+                raise ValueError(f"plage de {n} invalide ou hors des bornes de l'action [{env_low[i]:g}, {env_high[i]:g}].")
+        if n in opts.fixed:
+            low[i] = high[i] = float(np.clip(float(opts.fixed[n]), env_low[i], env_high[i]))
+    sweep_kw = dict(hold_max=opts.hold_max, extreme=opts.extreme, max_steps=opts.max_steps, should_stop=should_stop, action_fn=action_fn, bounds=(low, high))
     log(f"Balayage : {opts.episodes} episode(s) d'apprentissage + {opts.val_episodes} de validation (actions variees, paliers de 1 a {opts.hold_max} pas) ...")
     train = collect.sweep(env, opts.episodes, 100 + opts.seed, rng, on_episode=lambda k, n: bump(f"Balayage : episode {k}/{n}"), **sweep_kw)
     val = collect.sweep(env, opts.val_episodes, 900_000 + opts.seed, rng, on_episode=lambda k, n: bump(f"Validation : episode {k}/{n}"), **sweep_kw)

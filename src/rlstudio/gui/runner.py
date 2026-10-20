@@ -234,6 +234,20 @@ class DistillRunner(TrainRunner):
         super()._handle(line)
 
 
+class IdentifyRunner(DistillRunner):
+    """Identification d'un modele reduit (commande `identify` du worker) ; meme protocole que l'extraction."""
+
+    def __init__(self, project, settings: Settings, options: dict, parent=None):
+        super().__init__(project, settings, "", options, parent)
+
+    def start(self):
+        self.proc = _worker_process(self.settings, ["identify", "--project", str(self.project.path), "--options", json.dumps(self.options)], self)
+        self.proc.readyReadStandardOutput.connect(self._on_output)
+        self.proc.finished.connect(self._on_finished)
+        self.proc.errorOccurred.connect(self._on_error)
+        self.proc.start()
+
+
 class WorkerJob(QObject):
     """Commande ponctuelle du worker (inspect, matlab-test, env-info) ; resultat via `done`."""
 

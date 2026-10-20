@@ -61,11 +61,12 @@ def action_sequence(rng, low, high, n_steps, hold_max=10, extreme=0.2):
     return np.clip(U, low, high)
 
 
-def sweep(env, n_episodes, seed0, rng, hold_max=10, extreme=0.2, max_steps=None, should_stop=None, on_episode=None, action_fn=None):
+def sweep(env, n_episodes, seed0, rng, hold_max=10, extreme=0.2, max_steps=None, should_stop=None, on_episode=None, action_fn=None, bounds=None):
     """Joue `n_episodes` sequences d'actions variees (chaque `reset` retire les conditions initiales de l'environnement).
 
-    `action_fn(rng, low, high, n) -> U` remplace le generateur par defaut (par ex. politique apprise + bruit)."""
-    low, high = np.asarray(env.action_space.low, float), np.asarray(env.action_space.high, float)
+    `action_fn(rng, low, high, n) -> U` remplace le generateur par defaut (par ex. politique apprise + bruit).
+    `bounds=(low, high)` restreint les plages d'action balayees (une entree fixee : low == high)."""
+    low, high = (np.asarray(b, float) for b in (bounds or (env.action_space.low, env.action_space.high)))
     names_o = getattr(env, "obs_names", None) or [f"x{i}" for i in range(int(np.prod(env.observation_space.shape)))]
     names_a = getattr(env, "action_names", None) or [f"u{i}" for i in range(len(low))]
     data = DynData(names_o, names_a, low, high, float(getattr(env, "step_s", None) or getattr(env, "dt", None) or 1.0))
@@ -117,6 +118,11 @@ class SteadyData:
     def delta(self):
         return np.array(self.Y)
 
+    def select_outputs(self, names):
+        idx = [self.obs_names.index(n) for n in names]
+        self.obs_names = [self.obs_names[i] for i in idx]
+        self.Y = [y[idx] for y in self.Y]
+
     def copy(self):
         d = SteadyData(self.obs_names, self.act_names, self.low, self.high)
         d.U, d.Y, d.steps, d.dropped = list(self.U), list(self.Y), list(self.steps), self.dropped
@@ -142,27 +148,35 @@ def latin_hypercube(rng, n, low, high, extreme=0.15):
     return np.where(edge, np.where(rng.random((n, m)) < 0.5, low, high), U)
 
 
-def steady_sweep(env, design, seed0, rtol=1e-3, atol=1e-6, window=3, max_steps=None, scenario=False, should_stop=None, on_point=None):
+def steady_sweep(env, design, seed0, rtol=1e-3, atol=1e-6, window=3, max_steps=None, scenario=False, should_stop=None, on_point=None,
+                 swept=None, base=None):
     """Pour chaque ligne de `design`, maintient l'action constante jusqu'a convergence des sorties (|dy| <= atol + rtol.|y| pendant
     `window` pas consecutifs) et releve la sortie. Les points qui ne convergent pas sont ecartes (compteur `dropped`).
 
-    `scenario=True` : les variables tirees au `reset` (cle `initial` d'un projet Simulink : perturbations) deviennent des entrees."""
-    low, high = np.asarray(env.action_space.low, float), np.asarray(env.action_space.high, float)
+    `scenario=True` : les variables tirees au `reset` (cle `initial` d'un projet Simulink : perturbations) deviennent des entrees.
+    `swept` : indices des actions balayees (colonnes de `design`) ; `base` : vecteur d'action complet dont les autres composantes sont fixees."""
+    env_low, env_high = np.asarray(env.action_space.low, float), np.asarray(env.action_space.high, float)
+    swept = list(range(len(env_low))) if swept is None else list(swept)
+    base = np.asarray(base if base is not None else (env_low + env_high) / 2.0, float)
+    low, high = env_low[swept], env_high[swept]
     names_o = getattr(env, "obs_names", None) or [f"y{i}" for i in range(int(np.prod(env.observation_space.shape)))]
-    names_a = list(getattr(env, "action_names", None) or [f"u{i}" for i in range(len(low))])
+    names_a = list(getattr(env, "action_names", None) or [f"u{i}" for i in range(len(env_low))])
+    names_a = [names_a[i] for i in swept]
     horizon = int(max_steps or getattr(env, "n_steps", None) or getattr(env, "max_steps", None) or 200)
     data, extra_names = None, []
     for k, u in enumerate(np.clip(design, low, high)):
         if should_stop and should_stop():
             raise Stopped()
         obs, _ = env.reset(seed=int(seed0 + k))
+        u_full = base.copy()
+        u_full[swept] = u
         extra = dict(getattr(env, "_init_vars", None) or {}) if scenario else {}
         if data is None:
             extra_names = sorted(extra)
             data = SteadyData(names_o, names_a + extra_names, np.r_[low, [-np.inf] * len(extra_names)], np.r_[high, [np.inf] * len(extra_names)])
         prev, calm, steps, settled = np.asarray(obs, float).ravel(), 0, 0, False
         while steps < horizon:
-            obs, _r, terminated, truncated, _ = env.step(np.asarray(u, np.float32))
+            obs, _r, terminated, truncated, _ = env.step(np.asarray(u_full, np.float32))
             y = np.asarray(obs, float).ravel()
             steps += 1
             calm = calm + 1 if np.all(np.abs(y - prev) <= atol + rtol * np.abs(y)) else 0

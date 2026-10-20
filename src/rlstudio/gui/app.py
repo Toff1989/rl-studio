@@ -30,6 +30,7 @@ from . import theme
 from .theme import C
 from .. import runtime
 from .distill_tab import DistillTab
+from .identify_tab import IdentifyTab
 from .eval_tab import EvalTab
 from .explorer import SimulinkExplorer
 from .live_plots import SeriesPlot
@@ -278,10 +279,13 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self._tab_runs(), "Resultats")
         self.distill = DistillTab(self.settings)
         self.distill.busy.connect(lambda b: self.plist.setEnabled(not b))
+        self.identify = IdentifyTab(self.settings)
+        self.identify.busy.connect(lambda b: self.plist.setEnabled(not b))
         self.evaltab = EvalTab(self.settings)
         self.evaltab.busy.connect(lambda b: self.plist.setEnabled(not b))
         self.tabs.insertTab(4, self.evaltab, "Evaluation")
         self.tabs.addTab(self.distill, "Modele mathematique")
+        self.tabs.addTab(self.identify, "Identification")
         ml.addWidget(self.tabs, 1)
 
         root = QHBoxLayout()
@@ -536,6 +540,7 @@ class MainWindow(QMainWindow):
         self.c_rew_step.setPen(pg.mkPen(C["success"], width=2))
         if hasattr(self, "distill"):
             self.distill.restyle()
+            self.identify.restyle()
             self.evaltab.restyle()
         self.p_obs.restyle()
         self.p_act.restyle()
@@ -759,7 +764,7 @@ class MainWindow(QMainWindow):
 
         if self.dirty and not self._ask_save():
             return
-        if self.worker or any(getattr(t, "runner", None) for t in (self.distill, self.evaltab)):
+        if self.worker or any(getattr(t, "runner", None) for t in (self.distill, self.evaltab, self.identify)):
             QMessageBox.information(self, "Convertir un modele", "Attends la fin du calcul en cours avant de convertir un modele.")
             return
         dlg = ConvertDialog(self, self.settings, self.store)
@@ -911,6 +916,7 @@ class MainWindow(QMainWindow):
         self.a_kwargs.setPlainText(yaml.safe_dump(a.get("kwargs") or {}, sort_keys=False) if a.get("kwargs") else "")
         self._refresh_runs()
         self.distill.set_project(project)
+        self.identify.set_project(project)
         self.evaltab.set_project(project)
         self._reset_train_state()
         self._update_dashboard()
@@ -1153,6 +1159,7 @@ class MainWindow(QMainWindow):
         self.plist.setEnabled(True)
         self._refresh_runs()
         self.distill.set_project(self.project)
+        self.identify.set_project(self.project)
         self.evaltab.set_project(self.project)
         self._update_dashboard()
 

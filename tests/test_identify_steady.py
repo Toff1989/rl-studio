@@ -87,3 +87,31 @@ def test_exported_code_matches_model(report, cid):
 def test_scenario_variables_become_inputs():
     rep = steady_env(Plant(), SteadyOptions(methods=("linear",), samples=20, val_samples=5, scenario=True), log=lambda m: None)
     assert rep["in_names"] == ["u1", "u2", "d"]
+
+
+def test_ranges_fixed_and_outputs():
+    opts = SteadyOptions(methods=("linear",), samples=20, val_samples=5, ranges={"u1": [0.0, 1.0]}, fixed={"u2": 2.0}, outputs=["y2"])
+    rep = steady_env(Plant(), opts, log=lambda m: None)
+    assert rep["in_names"] == ["u1"] and rep["out_names"] == ["y2"]
+    for bad in ({"fixed": {"nope": 1}}, {"ranges": {"u1": [1, 0]}}, {"fixed": {"u1": 0, "u2": 0}}, {"outputs": ["zz"]}):
+        with pytest.raises(ValueError):
+            steady_env(Plant(), SteadyOptions(methods=("linear",), samples=10, val_samples=3, **bad), log=lambda m: None)
+
+
+def test_dynamic_ranges_and_fixed():
+    from rlstudio.identify import IdentifyOptions, identify_env
+
+    sys_path = __import__("sys").path
+    sys_path.insert(0, "tests")
+    from test_identify import Pendulum
+
+    opts = IdentifyOptions(methods=("linear",), episodes=4, val_episodes=2, ranges={"torque": [-1, 1]})
+    seen = []
+    env = Pendulum()
+    orig = env.step
+    env.step = lambda u: (seen.append(float(u[0])), orig(u))[1]
+    identify_env(env, opts, log=lambda m: None)
+    assert max(map(abs, seen)) <= 1.0 + 1e-6
+    seen.clear()
+    identify_env(env, IdentifyOptions(methods=("linear",), episodes=3, val_episodes=1, fixed={"torque": 0.5}), log=lambda m: None)
+    assert set(np.round(seen, 6)) == {0.5}
