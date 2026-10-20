@@ -6,11 +6,21 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.4.0] - 2026-10-20
+
 ### Ajouté
-- **Export Simulink des modèles identifiés** (bloc MATLAB Function ; dynamique avec état `persistent`), **identification dans les projets et les `.rls`** (`identify/options.json` toujours inclus, résultats `none|last|all` à l'export, code généré non embarqué et régénéré depuis `model.json`), réglages de l'onglet conservés avec le projet, et projet fourni **Usine non linéaire (identification)** pour essayer la fonction.
-- **Onglet Identification** : mode (régime permanent / dynamique), familles de modèles, entrées à balayer (plage Min/Max ou valeur fixée), sorties à modéliser, critères de stabilisation, nombre de points ou d'épisodes, perturbations comme entrées, hyperparamètres des modèles ; historique des résultats, graphiques, équations, export Python / MATLAB. Nouvelles commandes du worker `identify` et `env-signals`.
-- **Identification en régime permanent** (`rlstudio identify`, module `rlstudio.identify`) : sans politique ni entraînement, carte statique entrées → sorties `y = f(u)` : hypercube latin sur les entrées, chaque point simulé jusqu'à stabilisation, ajustement (linéaire, polynôme, équations parcimonieuses SINDy avec produits fonction × variable, réseau de neurones), validation sur points neufs, export Python / MATLAB (`steady_state`). Option `--scenario` : les variables `initial` deviennent des entrées.
-- **Identification de dynamique** (`rlstudio identify --mode dynamic`) : sans politique ni entraînement, balayage d'actions et de conditions initiales d'un environnement (Simulink ou Python) → modèle réduit `x(k+1) = x(k) + f(x, u)` linéaire, polynomial, en équations parcimonieuses (SINDy) ou en réseau de neurones (NumPy pur), validé en **simulation libre** sur des épisodes neufs (fidélité, erreur par horizon, courbe d'apprentissage), exporté en Python et MATLAB. Voir `docs/identification.md`.
+- **Identification d'un modèle réduit, sans politique ni entraînement** (module `rlstudio.identify`, commande `rlstudio identify`, onglet **Identification**). Le modèle (Simulink ou Python) est balayé puis remplacé par des équations ou un réseau de neurones, validé sur des points ou des épisodes jamais vus.
+  - **Régime permanent** (par défaut) : carte statique entrées → sorties `y = f(u)`. Hypercube latin sur les entrées, chaque point simulé jusqu'à stabilisation, points non convergés écartés. Option `--scenario` : les variables `initial` (perturbations) deviennent des entrées.
+  - **Dynamique** (`--mode dynamic`) : `x(k+1) = x(k) + f(x, u)`, paliers d'action aléatoires, validation en **simulation libre** (fidélité, erreur par horizon, courbe d'apprentissage).
+  - **Familles** : linéaire, polynôme (degrés 2 et 3), équations parcimonieuses (SINDy : monomes, `sin`, `cos`, `tanh`, `abs`, produits fonction × variable), réseau de neurones. NumPy pur.
+  - **Réglages complets** dans l'onglet : entrées balayées (plage Min/Max) ou fixées, sorties à modéliser, critères de stabilisation, nombre de points / d'épisodes, hyperparamètres des modèles, tolérance de recommandation.
+  - **Exports** : Python et MATLAB (`steady_state` / `dynamics`, compatibles génération de code), et **bloc Simulink** (MATLAB Function ; modèle dynamique avec état `persistent`).
+  - Nouvelles commandes du worker : `identify`, `env-signals`, `export-identify-simulink`.
+- **Identification dans les projets et les `.rls`** : réglages dans `identify/options.json` (toujours inclus à l'export), résultats `none|last|all` (`rlstudio export --identify`, choix dans le dialogue d'export), code généré non embarqué et régénéré depuis `model.json`. Le résumé d'import indique les identifications incluses.
+- **Projet fourni « Usine non linéaire (identification) »** : Python, 2 entrées / 2 sorties, formules du régime permanent connues, pour essayer la fonction.
+
+### Corrigé
+- L'export `.rls` n'embarquait pas de choix pour le dossier `identify/` ; il est désormais filtré (données seulement).
 
 ## [0.3.5] - 2026-10-19
 
