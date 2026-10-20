@@ -26,6 +26,16 @@ def main(argv=None):
     p.add_argument("--margin", type=float, default=0.05)
     p.add_argument("--integrators", default="", help="observations a integrer (PID), separees par des virgules")
     p.add_argument("--seed", type=int, default=0)
+    p = sub.add_parser("identify", help="identifie un modele reduit de la dynamique (balayage d'actions, sans politique)")
+    p.add_argument("slug")
+    p.add_argument("--methods", default="linear,polynomial,sparse,neural", help="liste separee par des virgules")
+    p.add_argument("--episodes", type=int, default=40, help="episodes de balayage")
+    p.add_argument("--val-episodes", type=int, default=10, help="episodes de validation (simulation libre)")
+    p.add_argument("--rounds", type=int, default=0, help="tours de collecte supplementaires (courbe d'apprentissage)")
+    p.add_argument("--hold-max", type=int, default=10, help="duree maximale d'un palier d'action, en pas")
+    p.add_argument("--epochs", type=int, default=300, help="epoques du reseau de neurones")
+    p.add_argument("--margin", type=float, default=0.05)
+    p.add_argument("--seed", type=int, default=0)
     p = sub.add_parser("delete", help="met un projet a la corbeille (.trash/)")
     p.add_argument("slug")
     p = sub.add_parser("export", help="exporte un projet dans un fichier .rls")
@@ -85,6 +95,13 @@ def main(argv=None):
                               integrators=tuple(i for i in args.integrators.split(",") if i))
         rep = run_distillation(pr, run_dir, opts)
         print(f"Modele recommande : {rep['recommended']}  (rapport et fichiers : {distill_dir(run_dir)})")
+    elif args.cmd == "identify":
+        from .identify import IdentifyOptions, run_identification
+
+        opts = IdentifyOptions(methods=tuple(m for m in args.methods.split(",") if m), episodes=args.episodes, val_episodes=args.val_episodes,
+                               rounds=args.rounds, hold_max=args.hold_max, epochs=args.epochs, margin=args.margin, seed=args.seed)
+        rep = run_identification(store.get(args.slug), opts)
+        print(f"Modele recommande : {rep['recommended']}  (rapport et fichiers : {rep['dir']})")
     elif args.cmd == "train":
         pr = store.get(args.slug)
         if args.timesteps:
