@@ -29,7 +29,7 @@
 - **Partage** : export/import de projets en un seul fichier **`.rls`** (double-clic ou glisser-déposer).
 - **Entraînement** en direct (récompense, observation, actions) avec comparaison à une politique de référence.
 - **Modèle mathématique** : extraction de la politique apprise sous forme de PID, table de gains, arbre de décision ou équation, validée en boucle fermée, exportable en Python / MATLAB / Simulink ([détails](docs/distillation.md)).
-- **Identification de dynamique** (`rlstudio identify`) : sans politique, balayage d'actions d'un modèle Simulink ou Python → modèle réduit (linéaire, polynôme, équations parcimonieuses SINDy, réseau de neurones) validé en simulation libre, exportable en Python / MATLAB ([détails](docs/identification.md)).
+- **Identification sans politique** (`rlstudio identify`) : balayage d'un modèle Simulink ou Python → carte entrées → sorties **en régime permanent** (défaut) ou dynamique `x(k+1) = x + f(x, u)` ; modèle réduit (linéaire, polynôme, équations parcimonieuses SINDy, réseau de neurones) validé en simulation libre, exportable en Python / MATLAB ([détails](docs/identification.md)).
 - **Installateur Windows** qui détecte le matériel (GPU NVIDIA, MATLAB) et installe les composants adaptés.
 - **Thèmes** Sombre, Clair, Matrix et personnalisables ; tous les réglages généraux dans la fenêtre *Paramètres*.
 

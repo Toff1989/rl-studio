@@ -20,7 +20,8 @@ class DynModel:
 
     kind = "dynamics"
 
-    def __init__(self, obs_names, act_names, dt, mu, sd, label=""):
+    def __init__(self, obs_names, act_names, dt, mu, sd, label="", static=False):
+        self.static = bool(static)  # vrai : carte entrees -> sorties en regime permanent, y = f(u) (pas d'etat, pas d'increment)
         self.obs_names, self.act_names = [str(n) for n in obs_names], [str(n) for n in act_names]
         self.dt = float(dt)
         self.mu, self.sd = np.asarray(mu, float).ravel(), np.maximum(np.asarray(sd, float).ravel(), 1e-12)
@@ -33,6 +34,14 @@ class DynModel:
     @property
     def n_u(self):
         return len(self.act_names)
+
+    @property
+    def in_names(self):
+        return self.act_names if self.static else self.obs_names + self.act_names
+
+    def predict(self, U):
+        """Mode statique : sorties en regime permanent pour des entrees U (N, m)."""
+        return self.delta(np.atleast_2d(np.asarray(U, float)))
 
     # -- evaluation ---------------------------------------------------------------------------
     def delta(self, Z: np.ndarray) -> np.ndarray:
@@ -73,13 +82,21 @@ class DynModel:
         raise NotImplementedError
 
     def _header(self):
+        if self.static:
+            return (f"{self.title()} - identifie par RL Studio. Regime permanent y = f(u). Entrees : {', '.join(self.act_names)} ; "
+                    f"sorties : {', '.join(self.obs_names)}.")
         return (f"{self.title()} - identifie par RL Studio. x(k+1) = x(k) + f(x(k), u(k)), pas {num(self.dt)} s. "
                 f"Etats : {', '.join(self.obs_names)} ; entrees : {', '.join(self.act_names)}.")
 
     def to_python(self, name="dynamics") -> str:
-        names = clean_names(self.obs_names + self.act_names, RESERVED_PY)
-        xs, us = names[: self.n_x], names[self.n_x:]
+        names = clean_names(self.in_names, RESERVED_PY)
+        xs, us = ([], names) if self.static else (names[: self.n_x], names[self.n_x:])
         consts, body = self.code("py", xs, us)
+        if self.static:
+            name = name if name != "dynamics" else "steady_state"
+            lines = [f'"""{self._header()}"""', "import numpy as np", ""] + consts + ["", "", f"def {name}(u):"]
+            lines += [f"    {n} = float(u[{i}])" for i, n in enumerate(us)] + [f"    d = np.zeros({self.n_x})"] + ["    " + ln for ln in body]
+            return "\n".join(lines + ["    return d", ""])
         lines = [f'"""{self._header()}"""', "import numpy as np", "", f"DT = {num(self.dt)}"] + consts + ["", "", f"def {name}(x, u):"]
         lines += [f"    {n} = float(x[{i}])" for i, n in enumerate(xs)] + [f"    {n} = float(u[{i}])" for i, n in enumerate(us)]
         lines += [f"    d = np.zeros({self.n_x})"] + ["    " + ln for ln in body]
@@ -87,9 +104,13 @@ class DynModel:
         return "\n".join(lines)
 
     def to_matlab(self, name="dynamics") -> str:
-        names = clean_names(self.obs_names + self.act_names, RESERVED_M)
-        xs, us = names[: self.n_x], names[self.n_x:]
+        names = clean_names(self.in_names, RESERVED_M)
+        xs, us = ([], names) if self.static else (names[: self.n_x], names[self.n_x:])
         consts, body = self.code("m", xs, us)
+        if self.static:
+            name = name if name != "dynamics" else "steady_state"
+            lines = [f"function y = {name}(u)", f"% {self._header()}", "%#codegen"] + [f"{n} = u({i + 1});" for i, n in enumerate(us)]
+            return "\n".join(lines + consts + [f"d = zeros({self.n_x}, 1);"] + body + ["y = d;", "end", ""])
         lines = [f"function xn = {name}(x, u)", f"% {self._header()}", "%#codegen"]
         lines += [f"{n} = x({i + 1});" for i, n in enumerate(xs)] + [f"{n} = u({i + 1});" for i, n in enumerate(us)]
         lines += consts + [f"d = zeros({self.n_x}, 1);"] + body + ["xn = x(:) + d;", "end", ""]
@@ -98,7 +119,7 @@ class DynModel:
     # -- serialisation -------------------------------------------------------------------------
     def _base(self):
         return {"kind": self.kind, "label": self.label, "obs_names": self.obs_names, "act_names": self.act_names, "dt": self.dt,
-                "mu": self.mu.tolist(), "sd": self.sd.tolist()}
+                "mu": self.mu.tolist(), "sd": self.sd.tolist(), "static": self.static}
 
     def to_dict(self) -> dict:
         raise NotImplementedError
@@ -112,6 +133,8 @@ def _term_values(term, S):
     k = term[0]
     if k == "const":
         return np.ones(len(S))
+    if k == "fx":  # fonction(s_i) * s_j
+        return _term_values((term[1], term[2]), S) * S[:, term[3]]
     if k == "mono":
         out = np.ones(len(S))
         for i, p in term[1]:
@@ -125,6 +148,8 @@ def _term_text(term, syms, lang):
     k = term[0]
     if k == "const":
         return "1"
+    if k == "fx":
+        return f"{_term_text((term[1], term[2]), syms, lang)}*{syms[term[3]]}"
     if k == "mono":
         pw = "**" if lang == "py" else "^"
         return "*".join(syms[i] if p == 1 else f"{syms[i]}{pw}{p}" for i, p in term[1])
@@ -137,7 +162,11 @@ def _jsonable(term):
 
 
 def _from_json(t):
-    return ("mono", tuple((int(i), int(p)) for i, p in t[1])) if t[0] == "mono" else (t[0],) if t[0] == "const" else (t[0], int(t[1]))
+    if t[0] == "mono":
+        return ("mono", tuple((int(i), int(p)) for i, p in t[1]))
+    if t[0] == "fx":
+        return ("fx", t[1], int(t[2]), int(t[3]))
+    return (t[0],) if t[0] == "const" else (t[0], int(t[1]))
 
 
 class TermModel(DynModel):
@@ -145,8 +174,8 @@ class TermModel(DynModel):
 
     kind = "terms"
 
-    def __init__(self, obs_names, act_names, dt, mu, sd, terms, C, normalize, label=""):
-        super().__init__(obs_names, act_names, dt, mu, sd, label)
+    def __init__(self, obs_names, act_names, dt, mu, sd, terms, C, normalize, label="", static=False):
+        super().__init__(obs_names, act_names, dt, mu, sd, label, static)
         self.terms, self.C, self.normalize = list(terms), np.asarray(C, float), bool(normalize)
 
     def _s(self, Z):
@@ -176,11 +205,13 @@ class TermModel(DynModel):
         return " + ".join(parts).replace("+ -", "- ") if parts else "0"
 
     def equations(self):
-        names = self.obs_names + self.act_names
+        names = self.in_names
         syms = self._syms(names, "m")
         out = []
         if self.normalize:
             out.append("variables reduites : " + " ; ".join(f"z_{n} = ({n} - {self.mu[i]:.4g}) / {self.sd[i]:.4g}" for i, n in enumerate(names)))
+        if self.static:
+            return out + [f"{n} = {self._expr(k, syms, 'm', 5)}" for k, n in enumerate(self.obs_names)]
         out += [f"{n}(k+1) = {n}(k) + [{self._expr(k, syms, 'm', 5)}]" for k, n in enumerate(self.obs_names)]
         out.append(f"(pas de temps : {self.dt:g} s ; delta/dt ~ derivee de l'etat)")
         return out
@@ -226,6 +257,8 @@ def _sparse_library(n):
     terms = _poly_library(n, 3, max_terms=200)
     for i in range(n):
         terms += [("sin", i), ("cos", i), ("tanh", i), ("abs", i)]
+    if n <= 8:  # produits fonction x variable (ex. sin(theta)*u) : non-linearites couplees frequentes en physique
+        terms += [("fx", f, i, j) for f in ("sin", "cos", "tanh", "abs") for i in range(n) for j in range(n) if i != j]
     return terms
 
 
@@ -243,6 +276,7 @@ def _solve(Phi, Y, active, ridge):
 
 
 def _fit_terms(data, terms, normalize, ridge, threshold=0.0, label=""):
+    static = bool(getattr(data, "static", False))
     Z, D = data.Z(), data.delta()
     mu, sd = Z.mean(0), Z.std(0)
     S = (Z - mu) / np.where(sd > 1e-12, sd, 1.0) if normalize else Z
@@ -267,22 +301,22 @@ def _fit_terms(data, terms, normalize, ridge, threshold=0.0, label=""):
         if len(active):
             c[active] = coef
         C[k] = c * dsd[k] / scale
-    return TermModel(data.obs_names, data.act_names, data.dt, mu, sd_eff, terms, C, normalize, label)
+    return TermModel(data.obs_names, data.act_names, data.dt, mu, sd_eff, terms, C, normalize, label, static)
 
 
 def fit_linear(data, ridge=1e-9) -> TermModel:
-    n = len(data.obs_names) + len(data.act_names)
+    n = data.n_in
     return _fit_terms(data, _linear_library(n), False, ridge, label="Lineaire (A.x + B.u + c)")
 
 
 def fit_polynomial(data, degree=3, ridge=1e-8) -> TermModel:
-    n = len(data.obs_names) + len(data.act_names)
+    n = data.n_in
     return _fit_terms(data, _poly_library(n, degree), True, ridge, label=f"Polynome degre {degree}")
 
 
 def fit_sparse(data, threshold, ridge=1e-8) -> TermModel:
     """SINDy : bibliotheque (monomes jusqu'au degre 3, sin, cos, tanh, abs) + regression a seuillage sequentiel."""
-    n = len(data.obs_names) + len(data.act_names)
+    n = data.n_in
     return _fit_terms(data, _sparse_library(n), False, ridge, threshold=threshold, label=f"Equation parcimonieuse (seuil {threshold:g})")
 
 
@@ -292,9 +326,9 @@ def fit_sparse(data, threshold, ridge=1e-8) -> TermModel:
 class NeuralDynModel(DynModel):
     kind = "neural"
 
-    def __init__(self, obs_names, act_names, dt, mu, sd, dsd, layers, label=""):
+    def __init__(self, obs_names, act_names, dt, mu, sd, dsd, layers, label="", static=False):
         """layers : [(W (out,in), b (out,))] ; tanh partout sauf la derniere (lineaire). delta = dsd * sortie."""
-        super().__init__(obs_names, act_names, dt, mu, sd, label or "Reseau de neurones")
+        super().__init__(obs_names, act_names, dt, mu, sd, label or "Reseau de neurones", static)
         self.dsd = np.maximum(np.asarray(dsd, float).ravel(), 1e-12)
         self.layers = [(np.asarray(W, float), np.asarray(b, float)) for W, b in layers]
 
@@ -316,7 +350,7 @@ class NeuralDynModel(DynModel):
 
     def equations(self):
         return [f"reseau {self.title().split()[-1]} ({self.complexity} parametres), activations tanh puis sortie lineaire",
-                "x(k+1) = x(k) + DSD .* ( Wn.tanh(...tanh(W1.((z - MU)/SD) + b1)...) + bn )",
+                ("y = " if self.static else "x(k+1) = x(k) + ") + "DSD .* ( Wn.tanh(...tanh(W1.((z - MU)/SD) + b1)...) + bn )",
                 "(formule explicite dans les fichiers exportes ; modele opaque, a utiliser comme modele reduit numerique)"]
 
     def code(self, lang, xs, us):
@@ -352,6 +386,7 @@ def fit_neural(data, hidden=(32, 32), epochs=300, lr=3e-3, batch=256, noise=0.02
     P = []
     for i, o in zip(sizes[:-1], sizes[1:]):
         P += [rng.normal(0, np.sqrt(1.0 / i), (o, i)), np.zeros(o)]
+    P[-1] = Y.mean(0).copy()  # sortie initiale = moyenne (utile en regime permanent, ou les sorties ne sont pas centrees)
     m, v = [np.zeros_like(p) for p in P], [np.zeros_like(p) for p in P]
     n_layers, step, n = len(sizes) - 1, 0, len(X)
     for ep in range(epochs):
@@ -379,15 +414,15 @@ def fit_neural(data, hidden=(32, 32), epochs=300, lr=3e-3, batch=256, noise=0.02
                 v[j] = 0.999 * v[j] + 0.001 * gr ** 2
                 p -= rate * (m[j] / (1 - 0.9 ** step)) / (np.sqrt(v[j] / (1 - 0.999 ** step)) + 1e-8)
     return NeuralDynModel(data.obs_names, data.act_names, data.dt, mu, sd, dsd, [(P[2 * k], P[2 * k + 1]) for k in range(n_layers)],
-                          label=f"Reseau de neurones ({'x'.join(map(str, hidden))})")
+                          label=f"Reseau de neurones ({'x'.join(map(str, hidden))})", static=bool(getattr(data, "static", False)))
 
 
 def model_from_dict(d: dict) -> DynModel:
     common = (d["obs_names"], d["act_names"], d["dt"], d["mu"], d["sd"])
     if d["kind"] == "terms":
-        return TermModel(*common, [_from_json(t) for t in d["terms"]], d["C"], d["normalize"], label=d.get("label", ""))
+        return TermModel(*common, [_from_json(t) for t in d["terms"]], d["C"], d["normalize"], label=d.get("label", ""), static=d.get("static", False))
     if d["kind"] == "neural":
-        return NeuralDynModel(*common, d["dsd"], [(W, b) for W, b in d["layers"]], label=d.get("label", ""))
+        return NeuralDynModel(*common, d["dsd"], [(W, b) for W, b in d["layers"]], label=d.get("label", ""), static=d.get("static", False))
     raise ValueError(f"type de modele inconnu : {d['kind']!r}")
 
 

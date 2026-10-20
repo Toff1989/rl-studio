@@ -1,6 +1,36 @@
-# Identifier un modele reduit de la dynamique (sans politique)
+# Identifier un modele reduit sans politique : regime permanent (defaut) ou dynamique
 
-`rlstudio identify <projet>` traite un modele (Simulink ou Python) comme une boite noire a **balayer** : aucune politique,
+## Regime permanent : entrees -> sorties (`rlstudio identify <projet>`)
+
+On ne cherche pas la dynamique, seulement l'**etat stabilise** en fonction des entrees : `y = f(u)`. Le modele (Simulink ou Python) est une
+boite noire que l'on balaie ; aucune politique, aucun entrainement.
+
+1. **Plan d'experience** : hypercube latin sur les entrees (actions de l'environnement, entre leurs bornes `low` / `high`), dont 15 % des
+   coordonnees aux bornes (saturations).
+2. **Etablissement** : chaque point est simule, action constante, jusqu'a stabilisation des sorties
+   (`|dy| <= atol + rtol.|y|` pendant 3 pas) ; la sortie stabilisee est relevee. Un point qui ne converge pas est ecarte et compte dans le rapport.
+3. **Ajustement** (memes familles que ci-dessous) : lineaire, polynome (degres 2 et 3), equation parcimonieuse (SINDy : monomes
+   jusqu'au degre 3, `sin`, `cos`, `tanh`, `abs`, produits fonction x variable), reseau de neurones.
+4. **Validation** sur des points neufs (R2 global et par sortie) ; recommandation du modele le plus simple avec R2 >= 98 %.
+
+```bash
+rlstudio identify mon-projet-simulink                                     # 200 points + 50 de validation
+rlstudio identify mon-projet --samples 1000 --max-settle-steps 400 --methods sparse,neural
+rlstudio identify mon-projet --scenario                                   # variables `initial` (perturbations) = entrees du modele
+```
+
+Fichiers : `projects/<projet>/identify/<date>/` : `report.json`, `report.md`, et par modele `steady_state.py`, `steady_state.m`
+(`y = steady_state(u)`, compatible generation de code), `equations.txt`, `model.json`.
+
+Points d'attention : domaine valable = plages balayees ; une entree `u` hors plage est extrapolee ; en cas de regimes permanents multiples
+(hysteresis), la sortie depend de l'histoire et le modele statique n'en donne qu'une moyenne ; `--scenario` n'a de sens que si les
+variables `initial` sont de vraies perturbations (pas des conditions initiales d'etat, qui n'influencent pas le regime permanent).
+
+---
+
+## Dynamique : `x(k+1) = x(k) + f(x, u)` (`rlstudio identify <projet> --mode dynamic`)
+
+Le mode dynamique traite un modele (Simulink ou Python) comme une boite noire a **balayer** : aucune politique,
 aucun entrainement. On en tire un modele reduit `x(k+1) = x(k) + f(x(k), u(k))`, en equations ou en reseau de neurones,
 exportable en Python et MATLAB. (A ne pas confondre avec [l'extraction d'une politique](distillation.md).)
 
@@ -29,8 +59,8 @@ d'apprentissage : faut-il plus de donnees ?), puis les agrege.
 ## Utilisation
 
 ```bash
-rlstudio identify mon-projet-simulink
-rlstudio identify mon-projet --episodes 200 --val-episodes 20 --rounds 3 --hold-max 15 --methods polynomial,sparse,neural
+rlstudio identify mon-projet-simulink --mode dynamic
+rlstudio identify mon-projet --mode dynamic --samples 200 --val-samples 20 --rounds 3 --hold-max 15 --methods polynomial,sparse,neural
 ```
 
 Resultats dans `projects/<projet>/identify/<date>/` : `report.json`, `report.md`, et un dossier par modele

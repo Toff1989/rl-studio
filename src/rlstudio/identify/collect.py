@@ -27,6 +27,12 @@ class DynData:
     def extend(self, other):
         self.episodes += other.episodes
 
+    static = False
+
+    @property
+    def n_in(self):
+        return len(self.obs_names) + len(self.act_names)
+
     def Z(self):
         return np.concatenate([np.hstack([X[:-1], U]) for X, U in self.episodes])
 
@@ -80,4 +86,98 @@ def sweep(env, n_episodes, seed0, rng, hold_max=10, extreme=0.2, max_steps=None,
         data.add(X, used)
         if on_episode:
             on_episode(k + 1, n_episodes)
+    return data
+
+
+class SteadyData:
+    """Points de regime permanent : entrees U (N, m) -> sorties Y (N, d)."""
+
+    static = True
+
+    def __init__(self, out_names, in_names, low, high):
+        self.obs_names, self.act_names = list(out_names), list(in_names)  # memes attributs que DynData : les ajustements sont communs
+        self.low, self.high, self.dt = np.asarray(low, float), np.asarray(high, float), 0.0
+        self.U: list[np.ndarray] = []
+        self.Y: list[np.ndarray] = []
+        self.steps: list[int] = []
+        self.dropped = 0
+
+    @property
+    def n_in(self):
+        return len(self.act_names)
+
+    def add(self, u, y, steps):
+        self.U.append(np.asarray(u, float).ravel())
+        self.Y.append(np.asarray(y, float).ravel())
+        self.steps.append(int(steps))
+
+    def Z(self):
+        return np.array(self.U)
+
+    def delta(self):
+        return np.array(self.Y)
+
+    def copy(self):
+        d = SteadyData(self.obs_names, self.act_names, self.low, self.high)
+        d.U, d.Y, d.steps, d.dropped = list(self.U), list(self.Y), list(self.steps), self.dropped
+        return d
+
+    def extend(self, other):
+        self.U += other.U
+        self.Y += other.Y
+        self.steps += other.steps
+        self.dropped += other.dropped
+
+    def __len__(self):
+        return len(self.U)
+
+
+def latin_hypercube(rng, n, low, high, extreme=0.15):
+    """Plan d'entrees : hypercube latin (couverture uniforme de chaque entree) dont une part des coordonnees est prise aux bornes."""
+    low, high = np.asarray(low, float), np.asarray(high, float)
+    m = len(low)
+    cells = (np.array([rng.permutation(n) for _ in range(m)]).T + rng.random((n, m))) / n
+    U = low + cells * (high - low)
+    edge = rng.random((n, m)) < extreme
+    return np.where(edge, np.where(rng.random((n, m)) < 0.5, low, high), U)
+
+
+def steady_sweep(env, design, seed0, rtol=1e-3, atol=1e-6, window=3, max_steps=None, scenario=False, should_stop=None, on_point=None):
+    """Pour chaque ligne de `design`, maintient l'action constante jusqu'a convergence des sorties (|dy| <= atol + rtol.|y| pendant
+    `window` pas consecutifs) et releve la sortie. Les points qui ne convergent pas sont ecartes (compteur `dropped`).
+
+    `scenario=True` : les variables tirees au `reset` (cle `initial` d'un projet Simulink : perturbations) deviennent des entrees."""
+    low, high = np.asarray(env.action_space.low, float), np.asarray(env.action_space.high, float)
+    names_o = getattr(env, "obs_names", None) or [f"y{i}" for i in range(int(np.prod(env.observation_space.shape)))]
+    names_a = list(getattr(env, "action_names", None) or [f"u{i}" for i in range(len(low))])
+    horizon = int(max_steps or getattr(env, "n_steps", None) or getattr(env, "max_steps", None) or 200)
+    data, extra_names = None, []
+    for k, u in enumerate(np.clip(design, low, high)):
+        if should_stop and should_stop():
+            raise Stopped()
+        obs, _ = env.reset(seed=int(seed0 + k))
+        extra = dict(getattr(env, "_init_vars", None) or {}) if scenario else {}
+        if data is None:
+            extra_names = sorted(extra)
+            data = SteadyData(names_o, names_a + extra_names, np.r_[low, [-np.inf] * len(extra_names)], np.r_[high, [np.inf] * len(extra_names)])
+        prev, calm, steps, settled = np.asarray(obs, float).ravel(), 0, 0, False
+        while steps < horizon:
+            obs, _r, terminated, truncated, _ = env.step(np.asarray(u, np.float32))
+            y = np.asarray(obs, float).ravel()
+            steps += 1
+            calm = calm + 1 if np.all(np.abs(y - prev) <= atol + rtol * np.abs(y)) else 0
+            prev = y
+            if calm >= window:
+                settled = True
+                break
+            if terminated or truncated:
+                break
+        if settled:
+            data.add(np.r_[u, [extra[n] for n in extra_names]], prev, steps)
+        else:
+            data.dropped += 1
+        if on_point:
+            on_point(k + 1, len(design))
+    if data is None:
+        raise ValueError("Plan d'experience vide.")
     return data

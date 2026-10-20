@@ -199,11 +199,12 @@ def _notes(candidates, ok, opts, train):
 
 def write_candidate(dirpath: Path, model) -> dict:
     dirpath.mkdir(parents=True, exist_ok=True)
-    (dirpath / "dynamics.py").write_text(model.to_python("dynamics"), encoding="utf-8")
-    (dirpath / "dynamics.m").write_text(model.to_matlab("dynamics"), encoding="utf-8")
+    stem = "steady_state" if model.static else "dynamics"
+    (dirpath / f"{stem}.py").write_text(model.to_python(stem), encoding="utf-8")
+    (dirpath / f"{stem}.m").write_text(model.to_matlab(stem), encoding="utf-8")
     (dirpath / "equations.txt").write_text(model.title() + "\n\n" + "\n".join(model.equations()) + "\n", encoding="utf-8")
     (dirpath / "model.json").write_text(json.dumps(model.to_dict()), encoding="utf-8")
-    return {"python": "dynamics.py", "matlab": "dynamics.m", "equations": "equations.txt", "json": "model.json"}
+    return {"python": f"{stem}.py", "matlab": f"{stem}.m", "equations": "equations.txt", "json": "model.json"}
 
 
 def load_candidate(report_dir, cid):
@@ -211,6 +212,8 @@ def load_candidate(report_dir, cid):
 
 
 def report_markdown(r: dict) -> str:
+    if r.get("mode") == "steady":
+        return _steady_markdown(r)
     lines = [f"# Modele reduit identifie - {r['project']}", "",
              f"Genere le {r['created']} par RL Studio {r['version']} : {r['n_train']} transitions d'apprentissage, {r['n_val']} de validation, pas {r['dt']:g} s.", "",
              "Fidelite en simulation libre : 1 = trajectoire reproduite, 0 = aussi mauvais qu'une valeur constante (episodes jamais vus).", "",
@@ -229,3 +232,18 @@ def write_report(report: dict, out_dir: Path):
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "report.json").write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
     (out_dir / "report.md").write_text(report_markdown(report), encoding="utf-8")
+
+
+def _steady_markdown(r: dict) -> str:
+    lines = [f"# Modele entrees -> sorties en regime permanent - {r['project']}", "",
+             f"Genere le {r['created']} par RL Studio {r['version']} : {r['n_train']} points d'apprentissage, {r['n_val']} de validation, "
+             f"{r['dropped']} ecarte(s) ; stabilisation en {r['mean_settle_steps']:.1f} pas en moyenne.", "",
+             f"Entrees : {', '.join(r['in_names'])} ; sorties : {', '.join(r['out_names'])}.", "",
+             "R2 sur des points jamais vus : 1 = carte reproduite, 0 = aussi mauvais qu'une valeur moyenne.", "",
+             "| Modele | Complexite | R2 | NRMSE | Erreur max | |", "|---|---:|---:|---:|---:|---|"]
+    for c in r["candidates"]:
+        lines.append(f"| {c['label']} | {c['complexity']} | {c['r2']:.4f} | {c['nrmse']:.3f} | {c['max_abs_err']:.2f} | {'recommande' if c['id'] == r['recommended'] else ''} |")
+    rec = next(c for c in r["candidates"] if c["id"] == r["recommended"])
+    lines += ["", f"## Modele recommande : {rec['label']}", "", "```", *rec["equations"], "```", "",
+              "R2 par sortie : " + ", ".join(f"{k} : {v:.3f}" for k, v in rec["r2_by_output"].items())]
+    return "\n".join(lines + ["", "## Points d'attention", ""] + [f"- {n}" for n in r["notes"]]) + "\n"
