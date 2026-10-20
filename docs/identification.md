@@ -14,7 +14,34 @@ Tout se parametre dans l'onglet (ou en ligne de commande, plus bas) :
 - **Resultats** : historique des identifications du projet, tableau comparatif, graphique complexite / fidelite, nuage modele vs systeme (par
   sortie) ou erreur par horizon, equations, copie / enregistrement en Python ou MATLAB.
 
-Les resultats sont enregistres dans `projects/<projet>/identify/<date>/`.
+Les resultats sont enregistres dans `projects/<projet>/identify/<date>/`, et les reglages dans `identify/options.json` : ils sont
+retrouves a la reouverture du projet.
+
+### Export vers Simulink
+
+*Exporter vers Simulink...* (modele selectionne) genere un `.slx` (MATLAB requis) : Inport (une par entree) -> bloc **MATLAB Function** ->
+Outport (une par sortie), code compatible generation de code.
+- **Regime permanent** : `y = fcn(u)`, sans etat.
+- **Dynamique** : les entrees sont les actions, les sorties sont l'etat ; la fonction garde l'etat (`persistent`) et avance d'un pas a chaque pas
+  d'echantillonnage `dt`. Etat initial = moyenne des etats initiaux du balayage.
+En ligne de commande du worker : `export-identify-simulink --project ... --report <date> --candidate <id> --out modele.slx`.
+
+### Projets et fichiers `.rls`
+
+L'identification fait partie du projet : `identify/` voyage avec lui. Dans l'export `.rls` (menu *Exporter*, ou `rlstudio export --identify none|last|all`) :
+les **reglages** sont toujours inclus ; les **resultats** (rapport, equations, `model.json`) selon le choix (dernier par defaut) ; le **code genere**
+(`.py`, `.m`) n'est jamais embarque - il est regenere depuis `model.json` a la demande, ce qui evite d'afficher un avertissement de securite pour du code
+que l'on peut reconstruire. A l'import, tout est retrouve dans l'onglet Identification.
+
+### Modeles pour essayer
+
+- **Usine non lineaire (identification)** : projet fourni (*Nouveau projet > Usine non lineaire*), Python, 2 entrees / 2 sorties, formules
+  du regime permanent connues : l'identification doit les retrouver (`y1 = 0,5 u2^2 + 3 tanh u1`, `y2 = |u1| + sin u1 . u2`).
+- **Pendule inverse (Simulink)** : projet fourni, utile en mode *dynamique* (instable : pas de regime permanent).
+- **Demos livrees avec Simulink** (aucun telechargement) : `sldemo_engine` (moteur : regime permanent regime = f(papillon, couple resistant),
+  tables non lineaires), `sldemo_househeat` (maison chauffee : thermostat a hysteresis, donc cycle sans regime permanent unique). Pour un
+  modele a vous, utiliser *Convertir un modele Simulink* puis l'onglet Identification.
+
 
 ## Regime permanent : entrees -> sorties (`rlstudio identify <projet>`)
 

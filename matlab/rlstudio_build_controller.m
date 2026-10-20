@@ -1,8 +1,9 @@
 function rlstudio_build_controller(outSlx, specJson)
 %RLSTUDIO_BUILD_CONTROLLER Construit un modele Simulink contenant un controleur extrait par RL Studio.
 %   outSlx   : chemin du modele a creer (ecrase s'il existe)
-%   specJson : fichier JSON {obs_names, act_names, code, sample_time}
-%              code = texte d'une fonction MATLAB `u = fcn(obs)` (compatible generation de code)
+%   specJson : fichier JSON {obs_names, act_names, code, sample_time, description}
+%              code = texte d'une fonction MATLAB `u = fcn(obs)` (compatible generation de code) ;
+%              utilise aussi pour les modeles reduits identifies : entrees = obs_names, sorties = act_names
 %   Structure : Inport (un par observation) -> Mux -> bloc MATLAB Function -> Demux -> Outport (un par action).
 spec = jsondecode(fileread(specJson));
 obsNames = cellstr(spec.obs_names);
@@ -47,7 +48,9 @@ else
         add_line(mdl, sprintf('ActDemux/%d', k), [actNames{k} '/1']);
     end
 end
-set_param(mdl, 'Description', 'Controleur extrait de la politique apprise par RL Studio (voir equations.txt).');
+desc = 'Controleur extrait de la politique apprise par RL Studio (voir equations.txt).';
+if isfield(spec, 'description') && ~isempty(spec.description), desc = spec.description; end
+set_param(mdl, 'Description', desc);
 save_system(mdl, outSlx);
 close_system(mdl, 0);
 end

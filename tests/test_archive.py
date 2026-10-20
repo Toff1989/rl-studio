@@ -213,3 +213,35 @@ def test_gui_import_with_and_without_confirmation(project, tmp_path):
     assert win.project.slug == imported.slug
     win.close()
     app.processEvents()
+
+
+# -- identification dans le projet ----------------------------------------------------------
+def make_identification(project, stamp, with_code=True):
+    d = project.path / "identify" / stamp
+    for cid in ("linear", "neural"):
+        (d / cid).mkdir(parents=True)
+        for name in ("model.json", "equations.txt") + (("steady_state.py", "steady_state.m") if with_code else ()):
+            (d / cid / name).write_text("x", encoding="utf-8")
+    (d / "report.json").write_text("{}", encoding="utf-8")
+    (d / "report.md").write_text("# r", encoding="utf-8")
+
+
+def test_identification_export_modes_and_no_generated_code(tmp_path):
+    store = ProjectStore(root=tmp_path / "projects", templates=TEMPLATES_DIR)
+    project = store.create("Id", "python_blank")
+    make_identification(project, "20260101-100000")
+    make_identification(project, "20260102-100000")
+    (project.path / "identify" / "options.json").write_text("{}", encoding="utf-8")
+    for mode, expected in (("none", []), ("last", ["20260102-100000"]), ("all", ["20260102-100000", "20260101-100000"])):
+        out = export_project(project, tmp_path / f"{mode}.rls", identify=mode)
+        n = names(out)
+        assert "project/identify/options.json" in n                       # reglages toujours embarques
+        assert not [x for x in n if x.endswith((".py", ".m")) and "/identify/" in x]  # pas de code genere dans l'archive
+        got = sorted({x.split("/")[2] for x in n if x.startswith("project/identify/") and x.count("/") > 2}, reverse=True)
+        assert got == expected
+        assert inspect_archive(out)["identifications"] == expected
+        assert inspect_archive(out)["code_files"] == ["env.py"]
+    other = ProjectStore(root=tmp_path / "other", templates=TEMPLATES_DIR)
+    back = import_project(export_project(project, tmp_path / "all.rls", identify="all"), other)
+    assert (back.path / "identify" / "20260101-100000" / "linear" / "model.json").exists()
+    assert (back.path / "identify" / "options.json").exists()

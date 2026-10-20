@@ -26,6 +26,7 @@ class DynModel:
         self.dt = float(dt)
         self.mu, self.sd = np.asarray(mu, float).ravel(), np.maximum(np.asarray(sd, float).ravel(), 1e-12)
         self.label = label or self.kind
+        self.x0 = None  # etat initial par defaut (modele dynamique) : moyenne des etats initiaux du balayage
 
     @property
     def n_x(self):
@@ -119,7 +120,8 @@ class DynModel:
     # -- serialisation -------------------------------------------------------------------------
     def _base(self):
         return {"kind": self.kind, "label": self.label, "obs_names": self.obs_names, "act_names": self.act_names, "dt": self.dt,
-                "mu": self.mu.tolist(), "sd": self.sd.tolist(), "static": self.static}
+                "mu": self.mu.tolist(), "sd": self.sd.tolist(), "static": self.static,
+                "x0": None if self.x0 is None else [float(v) for v in self.x0]}
 
     def to_dict(self) -> dict:
         raise NotImplementedError
@@ -418,6 +420,12 @@ def fit_neural(data, hidden=(32, 32), epochs=300, lr=3e-3, batch=256, noise=0.02
 
 
 def model_from_dict(d: dict) -> DynModel:
+    model = _model_from_dict(d)
+    model.x0 = d.get("x0")
+    return model
+
+
+def _model_from_dict(d: dict) -> DynModel:
     common = (d["obs_names"], d["act_names"], d["dt"], d["mu"], d["sd"])
     if d["kind"] == "terms":
         return TermModel(*common, [_from_json(t) for t in d["terms"]], d["C"], d["normalize"], label=d.get("label", ""), static=d.get("static", False))

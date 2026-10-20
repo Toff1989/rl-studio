@@ -46,6 +46,7 @@ def main(argv=None):
     p.add_argument("slug")
     p.add_argument("fichier")
     p.add_argument("--runs", choices=["none", "last", "all"], default="none", help="resultats d'entrainement a inclure")
+    p.add_argument("--identify", choices=["none", "last", "all"], default="last", help="resultats d'identification a inclure")
     p = sub.add_parser("import", help="importe un fichier .rls comme nouveau projet")
     p.add_argument("fichier")
     p.add_argument("--yes", action="store_true", help="ne pas demander confirmation (projets de confiance uniquement)")
@@ -65,7 +66,7 @@ def main(argv=None):
     elif args.cmd == "export":
         from .archive import export_project
 
-        out = export_project(store.get(args.slug), args.fichier, runs=args.runs)
+        out = export_project(store.get(args.slug), args.fichier, runs=args.runs, identify=args.identify)
         print(f"Exporte : {out} ({out.stat().st_size / 1024:.0f} Ko)")
     elif args.cmd == "import":
         from .archive import ArchiveError, import_project, inspect_archive

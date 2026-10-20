@@ -170,6 +170,7 @@ def identify_env(env, opts, name="env", out_dir=None, log=print, progress=None, 
             raise Stopped()
         log(f"== {METHOD_LABELS[family]} ({cid})")
         model = build()
+        model.x0 = np.mean([X[0] for X, _ in train.episodes], axis=0)
         res = evaluate(model, val, state_std, clip)
         entry = {"id": cid, "family": family, "label": model.title(), "complexity": int(model.complexity), **res,
                  "equations": (model.equations()[:80])}
@@ -221,6 +222,16 @@ def write_candidate(dirpath: Path, model) -> dict:
     (dirpath / "equations.txt").write_text(model.title() + "\n\n" + "\n".join(model.equations()) + "\n", encoding="utf-8")
     (dirpath / "model.json").write_text(json.dumps(model.to_dict()), encoding="utf-8")
     return {"python": f"{stem}.py", "matlab": f"{stem}.m", "equations": "equations.txt", "json": "model.json"}
+
+
+def ensure_files(report_dir, cid) -> Path:
+    """Dossier du modele `cid`, avec son code Python / MATLAB (regenere depuis model.json : un .rls n'embarque pas de code genere)."""
+    d = Path(report_dir) / cid
+    model = models.model_from_dict(json.loads((d / "model.json").read_text(encoding="utf-8")))
+    stem = "steady_state" if model.static else "dynamics"
+    if not (d / f"{stem}.py").exists() or not (d / f"{stem}.m").exists():
+        write_candidate(d, model)
+    return d
 
 
 def load_candidate(report_dir, cid):

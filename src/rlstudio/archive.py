@@ -5,6 +5,8 @@ Disposition de l'archive :
     rlstudio.json          manifeste (format, version, nom, type, contenu)
     project/project.yaml   puis tous les fichiers du projet (env.py, model.slx, donnees...)
     project/runs/<id>/     optionnel : resultats d'entrainement (modele, reference, configuration)
+    project/identify/      optionnel : reglages et resultats d'identification (rapport, equations, model.json ; sans code genere,
+                           regenere a la demande depuis model.json)
 
 SECURITE : un projet contient du code (env.py, modeles Simulink dont les callbacks, scripts .m) qui s'execute sur la
 machine de l'utilisateur. L'import ne peut donc pas etre « sans risque » : il valide tous les chemins (zip-slip,
@@ -33,7 +35,7 @@ MANIFEST = "rlstudio.json"
 PREFIX = "project/"
 
 # non exportes : caches, fichiers generes, historique
-EXCLUDE_DIRS = {"runs", "__pycache__", ".git", ".trash", "slprj", ".ipynb_checkpoints", ".vscode", ".idea"}
+EXCLUDE_DIRS = {"runs", "identify", "__pycache__", ".git", ".trash", "slprj", ".ipynb_checkpoints", ".vscode", ".idea"}
 EXCLUDE_SUFFIXES = {".pyc", ".pyo", ".slxc", ".autosave", ".asv", ".tmp"}
 EXCLUDE_NAMES = {".DS_Store", "Thumbs.db"}
 
@@ -69,10 +71,24 @@ def _run_dirs(project: Project, mode: str):
     return [] if mode == "none" else runs[:1] if mode == "last" else runs
 
 
-def export_project(project: Project, dest, runs: str = "none") -> Path:
-    """Ecrit le projet dans `dest` (extension .rls ajoutee si besoin) et renvoie son chemin."""
-    if runs not in RUN_MODES:
-        raise ValueError(f"runs doit valoir {RUN_MODES}")
+IDENTIFY_DATA = {"report.json", "report.md", "model.json", "equations.txt", "options.json"}  # pas de .py / .m : regenerables
+
+
+def _identify_dirs(project: Project, mode: str):
+    base = project.path / "identify"
+    if mode == "none" or not base.is_dir():
+        return []
+    dirs = sorted((d for d in base.iterdir() if d.is_dir() and (d / "report.json").exists()), reverse=True)
+    return dirs[:1] if mode == "last" else dirs
+
+
+def export_project(project: Project, dest, runs: str = "none", identify: str = "last") -> Path:
+    """Ecrit le projet dans `dest` (extension .rls ajoutee si besoin) et renvoie son chemin.
+
+    `runs` : resultats d'entrainement inclus ; `identify` : resultats d'identification inclus (les reglages `identify/options.json`
+    sont toujours inclus)."""
+    if runs not in RUN_MODES or identify not in RUN_MODES:
+        raise ValueError(f"runs et identify doivent valoir {RUN_MODES}")
     dest = Path(dest)
     if dest.suffix.lower() != EXTENSION:
         dest = dest.with_name(dest.name + EXTENSION)
@@ -83,11 +99,20 @@ def export_project(project: Project, dest, runs: str = "none") -> Path:
         for p, rel in _walk_project(rd):
             files.append((p, f"runs/{rd.name}/{rel}"))
 
+    ident_dirs = _identify_dirs(project, identify)
+    for idd in ident_dirs:
+        for p, rel in _walk_project(idd):
+            if Path(rel).name in IDENTIFY_DATA:
+                files.append((p, f"identify/{idd.name}/{rel}"))
+    options = project.path / "identify" / "options.json"
+    if options.is_file() and not options.is_symlink():
+        files.append((options, "identify/options.json"))
+
     manifest = {
         "format": FORMAT, "format_version": FORMAT_VERSION, "app_version": __version__,
         "created": time.strftime("%Y-%m-%d %H:%M:%S"), "name": project.name, "slug": project.slug,
         "kind": project.kind, "description": project.cfg.get("description", ""),
-        "files": len(files), "runs": [rd.name for rd in run_dirs],
+        "files": len(files), "runs": [rd.name for rd in run_dirs], "identifications": [d.name for d in ident_dirs],
         "has_code": any(Path(rel).suffix.lower() in CODE_SUFFIXES for _, rel in files),
     }
     dest.parent.mkdir(parents=True, exist_ok=True)
@@ -173,7 +198,7 @@ def inspect_archive(path) -> dict:
     if blocked:
         problems.append("Fichiers executables refuses : " + ", ".join(blocked[:8]) + (" ..." if len(blocked) > 8 else ""))
     return {"manifest": manifest, "files": len(names), "size": total, "code_files": sorted(code),
-            "runs": manifest.get("runs", []), "problems": problems}
+            "runs": manifest.get("runs", []), "identifications": manifest.get("identifications", []), "problems": problems}
 
 
 def _validate_config(cfg) -> None:

@@ -8,6 +8,7 @@ Protocole : une ligne JSON par evenement sur stdout ; la commande `stop` arrive 
   matlab-test                                    demarre MATLAB et verifie Simulink
   env-info                                       versions installees (Python, PyTorch, CUDA...)
   identify     --project DIR [--options JSON]   identifie un modele reduit (regime permanent ou dynamique), sans politique
+  export-identify-simulink --project DIR --report NOM --candidate ID --out FICHIER.slx   modele reduit identifie -> bloc Simulink
   env-signals  --project DIR   actions (bornes) et observations de l'environnement du projet
   evaluate     --project DIR --run NOM [--policy agent|distill:ID]   rejoue des episodes en direct
   distill      --project DIR --run NOM [--options JSON]   extrait un modele mathematique d'un run
@@ -161,6 +162,19 @@ def cmd_identify(args):
         emit(type="done", stopped=True)
         return
     emit(type="done", stopped=False, recommended=report["recommended"], dir=report.get("dir"))
+
+
+def cmd_export_identify_simulink(args):
+    from .identify.export import build_simulink
+    from .identify.pipeline import identify_dir, load_candidate
+    from .project import Project
+
+    project = Project(args.project)
+    report_dir = identify_dir(project) / args.report
+    if not (report_dir / args.candidate / "model.json").is_file():
+        raise FileNotFoundError(f"modele introuvable : {args.report}/{args.candidate}")
+    out = build_simulink(load_candidate(report_dir, args.candidate), args.out, log=lambda m: emit(type="log", text=m))
+    emit(type="result", path=str(out))
 
 
 def cmd_env_signals(args):
@@ -367,6 +381,11 @@ def main(argv=None):
     p = sub.add_parser("identify")
     p.add_argument("--project", required=True)
     p.add_argument("--options")
+    p = sub.add_parser("export-identify-simulink")
+    p.add_argument("--project", required=True)
+    p.add_argument("--report", required=True)
+    p.add_argument("--candidate", required=True)
+    p.add_argument("--out", required=True)
     p = sub.add_parser("env-signals")
     p.add_argument("--project", required=True)
     p = sub.add_parser("evaluate")
@@ -384,7 +403,8 @@ def main(argv=None):
     args = ap.parse_args(argv)
     handlers = {"train": cmd_train, "inspect": cmd_inspect, "matlab-test": cmd_matlab_test, "env-info": cmd_env_info,
                 "analyze-model": cmd_analyze_model, "convert-model": cmd_convert_model,
-                "distill": cmd_distill, "identify": cmd_identify, "env-signals": cmd_env_signals, "evaluate": cmd_evaluate, "export-simulink": cmd_export_simulink}
+                "distill": cmd_distill, "identify": cmd_identify, "env-signals": cmd_env_signals,
+                "export-identify-simulink": cmd_export_identify_simulink, "evaluate": cmd_evaluate, "export-simulink": cmd_export_simulink}
     try:
         handlers[args.cmd](args)
     except Exception as e:

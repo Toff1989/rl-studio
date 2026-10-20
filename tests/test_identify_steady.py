@@ -115,3 +115,54 @@ def test_dynamic_ranges_and_fixed():
     seen.clear()
     identify_env(env, IdentifyOptions(methods=("linear",), episodes=3, val_episodes=1, fixed={"torque": 0.5}), log=lambda m: None)
     assert set(np.round(seen, 6)) == {0.5}
+
+
+def test_simulink_block_export_static_and_dynamic(report, tmp_path):
+    import json
+
+    from rlstudio.identify import IdentifyOptions, identify_env
+    from rlstudio.identify.export import block_code, build_spec
+
+    _, out = report
+    st = load_candidate(out, "sparse-t0.03")
+    spec = build_spec(st)
+    assert spec["obs_names"] == ["u1", "u2"] and spec["act_names"] == ["y1", "y2"] and spec["sample_time"] == -1.0
+    assert spec["code"].startswith("function y = fcn(u)") and "sin(u1)*u2" in spec["code"]
+    json.dumps(spec)  # serialisable pour MATLAB (jsondecode)
+
+    import sys
+    sys.path.insert(0, "tests")
+    from test_identify import Pendulum
+
+    rep = identify_env(Pendulum(), IdentifyOptions(methods=("linear",), episodes=6, val_episodes=2), out_dir=tmp_path, log=lambda m: None)
+    dyn = load_candidate(tmp_path, "linear")
+    assert dyn.x0 is not None and len(dyn.x0) == 2
+    code = block_code(dyn)
+    assert code.startswith("function x = fcn(u)") and "persistent xs;" in code and "function xn = dynamics_step(x, u)" in code
+    assert code.count("%#codegen") == 1 and "xs = dynamics_step(xs, u(:));" in code
+    spec = build_spec(dyn)
+    assert spec["obs_names"] == ["torque"] and spec["act_names"] == ["theta", "omega"] and abs(spec["sample_time"] - 0.05) < 1e-12
+    dyn.dt = 0.0
+    with pytest.raises(ValueError):
+        build_spec(dyn)
+
+
+def test_template_usine_identification_end_to_end(tmp_path):
+    """Projet Python fourni : l'identification retrouve les formules exactes, resultats ranges dans le projet, puis dans un .rls."""
+    from rlstudio.archive import export_project, import_project
+    from rlstudio.identify import run_steady
+    from rlstudio.paths import TEMPLATES_DIR
+    from rlstudio.project import ProjectStore
+
+    store = ProjectStore(root=tmp_path / "projects", templates=TEMPLATES_DIR)
+    p = store.create("Usine", "usine_identification")
+    rep = run_steady(p, SteadyOptions(methods=("sparse", "linear"), samples=120, val_samples=30, sparse_thresholds=(0.1,), seed=1), log=lambda m: None)
+    assert rep["recommended"] == "sparse-t0.1" and rep["dir"].startswith(str(p.path / "identify"))
+    eq = " ".join(next(c for c in rep["candidates"] if c["id"] == "sparse-t0.1")["equations"])
+    assert "tanh(u1)" in eq and "sin(u1)*u2" in eq and "abs(u1)" in eq
+    other = ProjectStore(root=tmp_path / "other", templates=TEMPLATES_DIR)
+    back = import_project(export_project(p, tmp_path / "u.rls"), other)
+    d = back.path / "identify" / __import__("pathlib").Path(rep["dir"]).name
+    assert (d / "report.json").exists() and not (d / "sparse-t0.1" / "steady_state.m").exists()   # code non embarque
+    from rlstudio.identify.pipeline import ensure_files
+    assert (ensure_files(d, "sparse-t0.1") / "steady_state.m").exists()                            # ... mais regenere a la demande

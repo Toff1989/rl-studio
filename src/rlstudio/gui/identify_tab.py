@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..identify import METHOD_LABELS, METHODS
-from ..identify.pipeline import identify_dir
+from ..identify.pipeline import ensure_files, identify_dir
 from .runner import IdentifyRunner, RuntimeMissing, WorkerJob
 from .theme import C
 from .widgets import Card, button, label, scroll_page
@@ -208,9 +208,10 @@ class IdentifyTab(QWidget):
         self.btn_copy_py = button("Copier Python", None, lambda: self._copy(".py"))
         self.btn_copy_m = button("Copier MATLAB", None, lambda: self._copy(".m"))
         self.btn_save = button("Enregistrer...", None, self._save_as)
+        self.btn_slx = button("Exporter vers Simulink...", None, self._export_simulink)
         self.btn_open = button("Ouvrir le dossier", None, self._open_dir)
         actions = QHBoxLayout()
-        for b in (self.btn_copy_py, self.btn_copy_m, self.btn_save, self.btn_open):
+        for b in (self.btn_copy_py, self.btn_copy_m, self.btn_save, self.btn_slx, self.btn_open):
             actions.addWidget(b)
         actions.addStretch()
         res = Card("Resultats")
@@ -296,6 +297,7 @@ class IdentifyTab(QWidget):
                                 "observations": obs, "initial": [i["variable"] for i in cfg.get("initial", [])]})
         self.btn_start.setEnabled(project is not None and self.runner is None)
         self.btn_read.setEnabled(project is not None)
+        self._load_options()
         self._refresh_results()
 
     def _read_signals(self):
@@ -379,6 +381,70 @@ class IdentifyTab(QWidget):
                 o["outputs"] = checked
         return o
 
+    # -- reglages du projet (identify/options.json : voyagent avec le projet, .rls compris) ----------
+    def _options_file(self):
+        return identify_dir(self.project) / "options.json" if self.project else None
+
+    def _save_options(self, opts):
+        f = self._options_file()
+        try:
+            f.parent.mkdir(parents=True, exist_ok=True)
+            f.write_text(json.dumps(opts, indent=2), encoding="utf-8")
+        except OSError:
+            pass
+
+    def _load_options(self):
+        f = self._options_file()
+        try:
+            o = json.loads(f.read_text(encoding="utf-8-sig")) if f and f.is_file() else None
+        except (OSError, ValueError):
+            o = None
+        if isinstance(o, dict):
+            self.apply_options(o)
+
+    def apply_options(self, o):
+        """Remet dans l'interface des options sauvegardees (champs absents ou invalides ignores)."""
+        def num(widget, key, scale=1.0):
+            if key in o and o[key] is not None:
+                try:
+                    widget.setValue(type(widget.value())(o[key] * scale) if isinstance(widget, QSpinBox) else float(o[key]) * scale)
+                except (TypeError, ValueError):
+                    pass
+
+        i = self.mode.findData(o.get("mode"))
+        if i >= 0:
+            self.mode.setCurrentIndex(i)
+        for m, cb in self.method_boxes.items():
+            if "methods" in o:
+                cb.setChecked(m in o["methods"])
+        for widget, key, scale in ((self.s_samples, "samples", 1), (self.s_val, "val_samples", 1), (self.s_extreme, "extreme", 100),
+                                   (self.s_rtol, "rtol", 100), (self.s_atol, "atol", 1), (self.s_window, "window", 1),
+                                   (self.f_epochs, "epochs", 1), (self.f_margin, "margin", 100), (self.f_seed, "seed", 1)):
+            if self.current_mode() == "steady" or key not in ("extreme",):
+                num(widget, key, scale)
+        if self.current_mode() == "dynamic":
+            for widget, key, scale in ((self.d_episodes, "episodes", 1), (self.d_val, "val_episodes", 1), (self.d_rounds, "rounds", 1),
+                                       (self.d_round_eps, "round_episodes", 1), (self.d_hold, "hold_max", 1), (self.d_extreme, "extreme", 100),
+                                       (self.d_maxsteps, "max_steps", 1)):
+                num(widget, key, scale)
+        self.s_settle.setValue(int(o.get("max_settle_steps") or 0))
+        self.s_scenario.setChecked(bool(o.get("scenario", False)))
+        for edit, key in ((self.f_poly, "poly_degrees"), (self.f_sparse, "sparse_thresholds"), (self.f_hidden, "hidden")):
+            if o.get(key):
+                edit.setText(", ".join(f"{v:g}" for v in o[key]))
+        ranges, fixed = o.get("ranges") or {}, o.get("fixed") or {}
+        for r in range(self.in_table.rowCount()):
+            name = self.in_table.item(r, 1).text()
+            if name in ranges:
+                self.in_table.item(r, 2).setText(f"{ranges[name][0]:g}")
+                self.in_table.item(r, 3).setText(f"{ranges[name][1]:g}")
+            if name in fixed:
+                self.in_table.item(r, 0).setCheckState(Qt.Unchecked)
+                self.in_table.item(r, 4).setText(f"{fixed[name]:g}")
+        if o.get("outputs"):
+            for k in range(self.out_list.count()):
+                self.out_list.item(k).setCheckState(Qt.Checked if self.out_list.item(k).text() in o["outputs"] else Qt.Unchecked)
+
     # -- calcul ------------------------------------------------------------------------------
     def _start(self):
         if not self.project:
@@ -388,6 +454,7 @@ class IdentifyTab(QWidget):
         except ValueError as e:
             QMessageBox.information(self, "Identification", str(e))
             return
+        self._save_options(opts)
         try:
             self.runner = IdentifyRunner(self.project, self.settings, opts, self)
             self.runner.log.connect(self._on_log)
@@ -587,7 +654,7 @@ class IdentifyTab(QWidget):
                                                     symbolBrush=C["accent"]))
 
     def _set_result_buttons(self, on):
-        for b in (self.btn_copy_py, self.btn_copy_m, self.btn_save, self.btn_open):
+        for b in (self.btn_copy_py, self.btn_copy_m, self.btn_save, self.btn_slx, self.btn_open):
             b.setEnabled(on)
 
     # -- exports -----------------------------------------------------------------------------
@@ -596,7 +663,13 @@ class IdentifyTab(QWidget):
 
     def _file(self, name):
         c = self._candidate()
-        return (self.report_dir / c["id"] / name) if c and self.report_dir else None
+        if not c or not self.report_dir:
+            return None
+        try:
+            ensure_files(self.report_dir, c["id"])  # un projet importe (.rls) n'embarque pas le code genere
+        except (OSError, ValueError, KeyError):
+            pass
+        return self.report_dir / c["id"] / name
 
     def _copy(self, ext):
         f = self._file(self._stem() + ext)
@@ -622,6 +695,23 @@ class IdentifyTab(QWidget):
             text = text.replace(self._stem(), Path(target).stem)
         Path(target).write_text(text, encoding="utf-8")
         self.status.setText(f"Enregistre : {target}")
+
+    def _export_simulink(self):
+        c = self._candidate()
+        if not c or not self.report_dir or not self.project:
+            return
+        suggestion = f"{'regime_permanent' if self._steady() else 'dynamique'}_{c['id'].replace('-', '_').replace('.', '_')}.slx"
+        target, _ = QFileDialog.getSaveFileName(self, "Modele Simulink", suggestion, "Modele Simulink (*.slx)")
+        if not target:
+            return
+        args = ["export-identify-simulink", "--project", str(self.project.path), "--report", self.report_dir.name, "--candidate", c["id"],
+                "--out", target]
+        self.job = WorkerJob(self.settings, args, self)
+        self.job.done.connect(lambda res, err: self.status.setText(f"Modele Simulink cree : {res['path']}" if res else f"ERREUR : {err}"))
+        self.job.done.connect(lambda *_: self.btn_slx.setEnabled(True))
+        self.btn_slx.setEnabled(False)
+        self.status.setText("Generation du modele Simulink (demarrage de MATLAB) ...")
+        self.job.start()
 
     def _open_dir(self):
         if self.report_dir and sys.platform == "win32" and self.report_dir.exists():

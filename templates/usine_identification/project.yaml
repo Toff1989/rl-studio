@@ -1,0 +1,11 @@
+template_name: Usine non lineaire (identification)
+template_description: "Banc d'essai de l'onglet Identification : usine Python a 2 entrees et 2 sorties (saturation, terme quadratique, sin, valeur absolue) a dynamique lente. Sert aussi de modele a remplacer par un modele reduit."
+name: Usine non lineaire
+description: Deux entrees (u1, u2), deux sorties (y1, y2), regime permanent connu en formules (voir env.py) ; premier ordre, constante de temps ~3 pas.
+kind: python
+env:
+  entry: env.py:make_env
+  params: {max_steps: 120}
+algo:
+  name: SAC
+  total_timesteps: 5000

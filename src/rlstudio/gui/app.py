@@ -786,12 +786,19 @@ class MainWindow(QMainWindow):
         if not ok:
             return
         mode = ("none", "last", "all")[labels.index(choice)]
+        ident = "last"
+        if (self.project.path / "identify").is_dir() and any((self.project.path / "identify").glob("*/report.json")):
+            id_labels = ["Avec la derniere identification (reglages inclus)", "Avec toutes les identifications", "Sans resultats d'identification"]
+            id_choice, ok = QInputDialog.getItem(self, "Exporter le projet", "Identification de modele reduit :", id_labels, 0, False)
+            if not ok:
+                return
+            ident = ("last", "all", "none")[id_labels.index(id_choice)]
         default = str(Path.home() / "Documents" / f"{self.project.slug}.rls")
         path, _ = QFileDialog.getSaveFileName(self, "Exporter le projet", default, "Projet RL Studio (*.rls)")
         if not path:
             return
         try:
-            out = export_project(self.project, path, runs=mode)
+            out = export_project(self.project, path, runs=mode, identify=ident)
         except Exception as e:
             QMessageBox.critical(self, "Export impossible", str(e))
             return
@@ -807,6 +814,8 @@ class MainWindow(QMainWindow):
         lines = [f"<b>{m['name']}</b> ({m['kind']}) - {report['files']} fichiers, {report['size'] / 1024:.0f} Ko"]
         if report["runs"]:
             lines.append(f"Resultats d'entrainement inclus : {len(report['runs'])}")
+        if report.get("identifications"):
+            lines.append(f"Resultats d'identification inclus : {len(report['identifications'])}")
         if report["code_files"]:
             shown = ", ".join(report["code_files"][:8]) + (" ..." if len(report["code_files"]) > 8 else "")
             lines.append("<br><b>Attention :</b> ce projet contient du <b>code qui s'executera sur votre ordinateur</b> "

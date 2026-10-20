@@ -110,3 +110,20 @@ def test_loads_steady_and_dynamic_reports(tab):
     t.table.selectRow(1)
     assert "y1 = " in t.equations.toPlainText() or "y2 = " in t.equations.toPlainText()
     app.processEvents()
+
+
+def test_options_roundtrip_through_project_file(tab):
+    t, project, _ = tab
+    name = project.cfg["env"]["actions"][0]["name"]
+    t.s_samples.setValue(123)
+    t.in_table.item(0, 2).setText("0.2")
+    t.f_hidden.setText("16, 8")
+    t.method_boxes["linear"].setChecked(False)
+    t.out_list.item(0).setCheckState(Qt.Unchecked)
+    opts = t.options()
+    t._save_options(opts)
+    assert (identify_dir(project) / "options.json").is_file()
+    t2 = type(t)(t.settings)
+    t2.set_project(project)
+    assert t2.options() == opts and t2.s_samples.value() == 123 and name in t2.options()["ranges"]
+    t2.deleteLater()
