@@ -6,10 +6,6 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
-### Corrigé
-- **Identification en régime permanent : « Trop peu de points stabilisés »** sur un projet dont les observations contiennent des signaux indépendants de l'entrée (horloge, occupation, météo : modèle *Ventilation CO2*). Aucun point ne se stabilisait, car ces signaux bougent à chaque pas. Ils sont désormais repérés automatiquement (observation strictement identique sous trois actions différentes, à départ égal), écartés des sorties à modéliser avec un message dans le journal et une remarque dans le rapport. Si rien ne se stabilise malgré tout, l'erreur nomme les sorties fautives et indique de les décocher dans « Sorties à modéliser ». Le test de stabilisation ne porte plus que sur les sorties choisies.
-- Plus d'avertissement numpy « Mean of empty slice » quand aucun point n'est retenu.
-
 ## [0.4.1] - 2026-10-21
 
 ### Ajouté
@@ -25,6 +21,8 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 - README à jour : les huit modèles de projet, toutes les commandes (`distill`, `identify`), plage de Python, organisation des tests.
 
 ### Corrigé
+- **Identification en régime permanent : « Trop peu de points stabilisés »** sur un projet dont les observations contiennent des signaux indépendants de l'entrée (horloge, occupation, météo : modèle *Ventilation CO2*). Aucun point ne se stabilisait, car ces signaux bougent à chaque pas. Ils sont désormais repérés automatiquement (observation strictement identique sous trois actions différentes, à départ égal), écartés des sorties à modéliser avec un message dans le journal et une remarque dans le rapport. Si rien ne se stabilise malgré tout, l'erreur nomme les sorties fautives et indique de les décocher dans « Sorties à modéliser ». Le test de stabilisation ne porte plus que sur les sorties choisies.
+- Plus d'avertissement numpy « Mean of empty slice » quand aucun point n'est retenu.
 - Une erreur écrite dans le journal d'un onglet n'apparaissait nulle part ailleurs : elle est maintenant remontée dans le bandeau.
 - Le contrôle du bundle (`check_bundle.py`) exige aussi le guide d'utilisation (ressource distincte des licences).
 
