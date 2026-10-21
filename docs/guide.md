@@ -107,9 +107,13 @@ Une bonne courbe de récompense **monte puis se stabilise**. Si elle reste plate
 
 Rejoue un entraînement terminé avec la politique déterministe (sans bruit d'exploration).
 
-- **Run** : l'entraînement à rejouer. **Politique** : l'agent entraîné ou un modèle mathématique extrait de ce run.
-- **Épisodes** et **Graine** : combien d'essais, et quelle suite de départs (la même graine donne les mêmes départs).
+- **Run** : l'entraînement à rejouer. **Politique** : qui pilote le système, soit l'agent entraîné, soit un modèle mathématique extrait de ce run, soit des **paliers d'actions aléatoires** qui ne demandent ni entraînement ni extraction.
+- **Épisodes** et **Graine** : combien d'essais, et quelle suite de départs (la même graine donne les mêmes départs et les mêmes paliers).
 - **Vitesse** : *Maximale* ou ralentie, pour suivre les courbes en direct.
+- **Modèle identifié à comparer** (facultatif) : rejoue un modèle de l'onglet *Identification* à côté du vrai système, avec les mêmes actions. Ses sorties sont tracées **en pointillé**, de la même couleur que le signal réel (légende « signal (modèle) »). Le journal et l'indicateur **Écart du modèle** donnent l'écart par signal (erreur quadratique moyenne divisée par l'écart-type du signal réel : 0 = identique).
+  - *Modèle dynamique* : simulation libre depuis l'observation de départ, avec les actions du pilote.
+  - *Modèle en régime permanent* : `y = f(u)` appliqué aux actions courantes. Il réagit sans délai, alors que le vrai système met du temps à s'établir : l'écart est normal pendant les transitions et faible quand les entrées varient lentement.
+  - Seuls les signaux modélisés sont comparés ; les entrées fixées lors de l'identification sont supposées à leur valeur d'origine (le journal les signale).
 - Les graphiques montrent observations, actions, récompense cumulée et le retour de chaque épisode.
 
 ### 5.6 Résultats
@@ -137,7 +141,7 @@ Remplace un modèle (Simulink ou Python) par un **modèle réduit**, **sans agen
 - **Sorties à modéliser** : les observations à reproduire.
 - **Balayage** : nombre de points (ou d'épisodes), points de validation, part des points aux bornes, critères de stabilisation (tolérances, nombre de pas stables, durée maximale), perturbations « initiales » comme entrées, etc.
 - **Modèles** : degrés du polynôme, seuils SINDy (plus grand = moins de termes), couches et époques du réseau, tolérance de recommandation, graine.
-- **Résultats** : historique des identifications, tableau comparatif (complexité, R2, NRMSE, erreur…), graphiques complexité / fidélité et modèle contre système, équations, export Python, MATLAB ou bloc Simulink.
+- **Résultats** : historique des identifications, tableau comparatif (complexité, R2, NRMSE, erreur…), graphiques complexité / fidélité et modèle contre système, équations, export Python, MATLAB ou bloc Simulink. Pour voir un modèle sur une courbe temporelle, choisissez-le dans l'onglet *Évaluation* (« Modèle identifié à comparer »).
 
 Un **NRMSE** proche de 0 signifie un modèle fidèle. Les points qui ne convergent pas sont écartés et signalés.
 

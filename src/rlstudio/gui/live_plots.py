@@ -7,6 +7,7 @@ from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QLayout, QScrollArea,
 from .theme import C, luminance
 
 LEGEND_MAX_HEIGHT = 100  # au-dela, la legende defile au lieu de manger la place du graphique
+MODEL_SUFFIX = " (modèle)"  # nom d'une courbe de modèle identifié : pointillé, couleur du signal réel
 REDRAW_MS = 40           # les points recus entre deux dessins sont regroupes : au plus ~25 dessins par seconde
 MAX_DRAWN = 1500         # points traces par courbe au maximum : le cout du dessin ne depend plus de la duree de l'episode
 
@@ -207,7 +208,17 @@ class SeriesPlot(QWidget):
         self.names = names
         self._rebuild()
 
+    def _color(self, i, cols):
+        """Couleur de la courbe `i` ; une courbe « (modèle) » reprend celle du signal réel qu'elle accompagne."""
+        name = self.names[i] if i < len(self.names) else ""
+        if name.endswith(MODEL_SUFFIX) and name[:-len(MODEL_SUFFIX)] in self.names:
+            return cols[self.names.index(name[:-len(MODEL_SUFFIX)])]
+        return cols[i]
+
     def _pen(self, i, cols):
+        name = self.names[i] if i < len(self.names) else ""
+        if name.endswith(MODEL_SUFFIX):  # modele identifie : pointille, meme couleur que le signal reel
+            return pg.mkPen(self._color(i, cols), width=2, style=Qt.DashLine)
         return pg.mkPen(cols[i], width=2)
 
     def _rebuild(self):
@@ -290,7 +301,7 @@ class SeriesPlot(QWidget):
         cols = palette(len(self.names))
         self.legend.clear()
         for i, n in enumerate(self.names):
-            chip = _Chip(n, cols[i])
+            chip = _Chip(n, self._color(i, cols))
             chip.on = n not in self.hidden
             chip.restyle()
             chip.toggled.connect(lambda on, n=n: self._set_visible(n, on))

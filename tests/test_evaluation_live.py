@@ -45,7 +45,7 @@ def test_distilled_policy_can_be_replayed(trained):
     p, run_dir = trained
     run_distillation(p, run_dir, DistillOptions(methods=("linear",), episodes=2, dagger_iters=0, eval_episodes=1, max_steps=30), log=lambda m: None)
     ids = [i for i, _ in policy_choices(run_dir)]
-    assert ids == ["agent", "distill:linear"]
+    assert ids == ["agent", "distill:linear", "steps"]
     s = run_evaluation(p, run_dir, "distill:linear", 1, 5, log=lambda m: None)
     assert s["episodes"] == 1
 

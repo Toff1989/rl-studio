@@ -5,8 +5,8 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QGridLayout, QHBoxLayout, QMessageBox, QPlainTextEdit, QSpinBox,
                                QVBoxLayout, QWidget)
 
-from ..evaluation import policy_choices
-from .live_plots import SeriesPlot
+from ..evaluation import MODEL_SEP, identified_choices, policy_choices
+from .live_plots import MODEL_SUFFIX, SeriesPlot
 from .notify import looks_like_error, summarize
 from .runner import EvalRunner, RuntimeMissing
 from .theme import C
@@ -23,12 +23,14 @@ class EvalTab(QWidget):
         super().__init__(parent)
         self.settings, self.project, self.runner = settings, None, None
         self.returns = []
+        self.model_names, self.model_errors = [], []
 
         self.run_combo = QComboBox()
         self.run_combo.currentIndexChanged.connect(self._fill_policies)
         self.policy_combo = QComboBox()
         self.f_episodes = QSpinBox(); self.f_episodes.setRange(1, 1000); self.f_episodes.setValue(5)
         self.f_seed = QSpinBox(); self.f_seed.setRange(0, 1_000_000); self.f_seed.setValue(1000)
+        self.model_combo = QComboBox()
         self.speed = QComboBox()
         for txt, _ in SPEEDS:
             self.speed.addItem(txt)
@@ -44,6 +46,8 @@ class EvalTab(QWidget):
                                             ("Épisodes", self.f_episodes, 1), ("Graine", self.f_seed, 1), ("Vitesse", self.speed, 1)]):
             form.addWidget(label(txt, "sectionLabel"), 0, i)
             form.addWidget(w, 1, i)
+        form.addWidget(label("Modèle identifié à comparer", "sectionLabel"), 2, 0, 1, 2)
+        form.addWidget(self.model_combo, 3, 0, 1, 5)
         form.setColumnStretch(0, 2)
         form.setColumnStretch(1, 3)
         bar = QHBoxLayout()
@@ -56,8 +60,9 @@ class EvalTab(QWidget):
         cfg.body.addLayout(bar)
 
         self.k_ep, self.k_step, self.k_ret, self.k_mean = Kpi("Épisode"), Kpi("Pas"), Kpi("Retour en cours"), Kpi("Retour moyen")
+        self.k_err = Kpi("Écart du modèle")
         kpis = QHBoxLayout()
-        for k in (self.k_ep, self.k_step, self.k_ret, self.k_mean):
+        for k in (self.k_ep, self.k_step, self.k_ret, self.k_mean, self.k_err):
             kpis.addWidget(k, 1)
 
         self.p_obs = SeriesPlot("Observations", "pas")
@@ -85,10 +90,17 @@ class EvalTab(QWidget):
         self.logbox.setObjectName("mono")
         self.logbox.setReadOnly(True)
         self.logbox.setMaximumBlockCount(5000)  # journal borne : il ne ralentit pas l'affichage
-        self.logbox.setFixedHeight(80)
+        self.logbox.setFixedHeight(110)
         tips(self, {
             "run_combo": "Entraînement à rejouer (seuls ceux qui ont un modèle enregistré sont proposés).",
-            "policy_combo": "Qui pilote le système : l'agent entraîné, ou un modèle mathématique extrait de cet entraînement (onglet Modèle mathématique).",
+            "policy_combo": "Qui pilote le système : l'agent entraîné, un modèle mathématique extrait de cet entraînement (onglet Modèle mathématique), "
+                            "ou des paliers d'actions aléatoires qui ne demandent aucun entraînement (pratique pour comparer un modèle identifié).",
+            "model_combo": "Facultatif : rejoue un modèle identifié (onglet Identification) à côté du vrai système, avec les mêmes actions. "
+                           "Ses sorties sont tracées en pointillé, de la même couleur que le signal réel. Modèle dynamique : simulation libre depuis "
+                           "l'observation de départ. Modèle en régime permanent : y = f(u) appliqué aux actions courantes ; il réagit sans délai, "
+                           "alors que le vrai système met du temps à s'établir, d'où un écart pendant les transitions.",
+            "k_err": "Écart moyen entre le modèle identifié et le système, par épisode : erreur quadratique moyenne divisée par l'écart-type du signal réel "
+                     "(0 = identique ; proche de 1 = pas mieux qu'une valeur constante). Le détail par signal est dans le journal.",
             "f_episodes": "Nombre d'épisodes (essais complets) à rejouer.",
             "f_seed": "Fixe les situations de départ : la même graine redonne les mêmes départs, ce qui permet de comparer deux politiques sur les mêmes cas.",
             "speed": "Vitesse de la lecture. « Maximale » va le plus vite possible ; les vitesses plus lentes permettent de suivre les courbes en direct.",
@@ -99,7 +111,8 @@ class EvalTab(QWidget):
             "k_step": "Numéro du pas dans l'épisode en cours.",
             "k_ret": "Somme des récompenses de l'épisode en cours.",
             "k_mean": "Moyenne des retours des épisodes terminés.",
-            "p_obs": "Observations (ce que l'agent voit) pendant l'épisode en cours. Cliquez sur la légende pour masquer ou afficher une courbe.",
+            "p_obs": "Observations (ce que l'agent voit) pendant l'épisode en cours ; en pointillé, les sorties du modèle identifié s'il y en a un. "
+                     "Cliquez sur la légende pour masquer ou afficher une courbe.",
             "p_act": "Actions (ce que l'agent commande) pendant l'épisode en cours. Cliquez sur la légende pour masquer ou afficher une courbe.",
             "p_cum": "Récompense cumulée depuis le début de l'épisode en cours.",
             "p_ret": "Retour (somme des récompenses) de chaque épisode terminé.",
@@ -138,17 +151,26 @@ class EvalTab(QWidget):
             self.run_combo.addItem(fmt_run_date(d.name), str(d))
         self.run_combo.blockSignals(False)
         self._fill_policies()
-        self.btn_start.setEnabled(bool(runs) and self.runner is None)
-        self.status.setText("Prêt." if runs else "Aucun run avec modèle : entraîne le projet d'abord.")
+        self.refresh_models()
+        self.btn_start.setEnabled(project is not None and self.runner is None)  # les paliers d'actions n'exigent aucun entraînement
+        self.status.setText("Prêt." if runs else "Aucun entraînement avec modèle : seuls les paliers d'actions aléatoires sont proposés.")
+
+    def refresh_models(self):
+        """Recharge la liste des modèles identifiés du projet (appelée aussi à la fin d'une identification)."""
+        current = self.model_combo.currentData()
+        self.model_combo.clear()
+        self.model_combo.addItem("Aucun", None)
+        for mid, txt in (identified_choices(self.project) if self.project else []):
+            self.model_combo.addItem(txt, mid)
+        i = self.model_combo.findData(current)
+        self.model_combo.setCurrentIndex(max(i, 0))
 
     def _fill_policies(self, *_):
         self.policy_combo.clear()
         d = self.run_combo.currentData()
-        if not d:
-            return
         from pathlib import Path
 
-        for pid, txt in policy_choices(Path(d)):
+        for pid, txt in policy_choices(Path(d) if d else None):
             self.policy_combo.addItem(txt, pid)
 
     # -- evaluation ------------------------------------------------------------------------
@@ -157,22 +179,28 @@ class EvalTab(QWidget):
         for p in (self.p_obs, self.p_act, self.p_cum):
             p.reset()
         self.bars.setOpts(x=[], height=[])
-        for k in (self.k_ep, self.k_step, self.k_ret, self.k_mean):
+        for k in (self.k_ep, self.k_step, self.k_ret, self.k_mean, self.k_err):
             k.set("-")
         self.logbox.clear()
         self._episode = 0
+        self.model_errors = []
 
     def _start(self):
         d, pid = self.run_combo.currentData(), self.policy_combo.currentData()
-        if not d or not pid or not self.project:
+        if not pid or not self.project or (pid != "steps" and not d):
             return
         from pathlib import Path
+
+        ident = self.model_combo.currentData()
+        identified = tuple(ident.split(MODEL_SEP, 1)) if ident else None
 
         self._reset_views()
         delay = SPEEDS[self.speed.currentIndex()][1]
         try:
-            self.runner = EvalRunner(self.project, self.settings, Path(d).name, pid, self.f_episodes.value(),
-                                     self.f_seed.value(), delay, self)
+            self.runner = EvalRunner(self.project, self.settings, Path(d).name if d and pid != "steps" else "", pid,
+                                     self.f_episodes.value(), self.f_seed.value(), delay, self, identified=identified)
+            self.model_names = []
+            self.runner.model_names.connect(lambda names: setattr(self, "model_names", names))
             self.runner.meta.connect(self._on_meta)
             self.runner.step.connect(self._on_step)
             self.runner.episode_done.connect(self._on_episode)
@@ -183,7 +211,7 @@ class EvalTab(QWidget):
             self.runner = None
             QMessageBox.warning(self, "Composants de calcul", str(e))
             return
-        for w in (self.btn_start, self.run_combo, self.policy_combo):
+        for w in (self.btn_start, self.run_combo, self.policy_combo, self.model_combo):
             w.setEnabled(False)
         self.btn_stop.setEnabled(True)
         self.status.setText("Évaluation en cours ...")
@@ -195,7 +223,8 @@ class EvalTab(QWidget):
             self.status.setText("Arrêt...")
 
     def _on_meta(self, obs_names, act_names):
-        self.p_obs.set_names(obs_names)
+        # le signal `model_names` est émis avant `meta` (même ligne du flux) : les courbes du modèle suivent celles du système
+        self.p_obs.set_names(list(obs_names) + [n + MODEL_SUFFIX for n in self.model_names])
         self.p_act.set_names(act_names)
 
     def _on_step(self, s):
@@ -204,7 +233,8 @@ class EvalTab(QWidget):
             for p in (self.p_obs, self.p_act, self.p_cum):
                 p.reset()
             self.k_ep.set(f"{s['episode']} / {self.f_episodes.value()}")
-        self.p_obs.append(s["step"], s["obs"])
+        model = s.get("model")
+        self.p_obs.append(s["step"], s["obs"] if model is None else np.r_[s["obs"], model])
         self.p_act.append(s["step"], s["action"])
         self.p_cum.append(s["step"], [s["total"]])
         self.k_step.set(str(s["step"]))
@@ -216,6 +246,12 @@ class EvalTab(QWidget):
         self.k_mean.set(f"{np.mean(self.returns):.2f}")
         self.logbox.appendPlainText(f"Épisode {ev['n']} : retour {ev['reward']:.3f}, {ev['length']} pas"
                                     + (" (arrêt anticipé)" if ev.get("terminated") else ""))
+        err = ev.get("model_error")
+        if err:
+            mean = float(np.nanmean([e["nrmse"] for e in err.values()]))
+            self.model_errors.append(mean)
+            self.k_err.set(f"{np.mean(self.model_errors):.3f}")
+            self.logbox.appendPlainText("   écart du modèle : " + ", ".join(f"{n} {e['nrmse']:.3f}" for n, e in err.items()))
 
     def _on_log(self, text):
         self.logbox.appendPlainText(text.rstrip())
@@ -224,7 +260,7 @@ class EvalTab(QWidget):
 
     def _on_finished(self, message):
         self.runner = None
-        for w in (self.btn_start, self.run_combo, self.policy_combo):
+        for w in (self.btn_start, self.run_combo, self.policy_combo, self.model_combo):
             w.setEnabled(True)
         self.btn_stop.setEnabled(False)
         self.busy.emit(False)

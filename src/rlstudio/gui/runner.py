@@ -169,11 +169,17 @@ class EvalRunner(TrainRunner):
 
     step = Signal(object)
     episode_done = Signal(object)
+    model_names = Signal(list)  # signaux du modele identifie rejoue a cote du systeme
 
-    def __init__(self, project, settings: Settings, run_name: str, policy: str, episodes: int, seed: int, delay: float, parent=None):
+    def __init__(self, project, settings: Settings, run_name: str, policy: str, episodes: int, seed: int, delay: float, parent=None,
+                 identified=None):
         super().__init__(project, settings, parent)
-        self.args = ["evaluate", "--project", str(project.path), "--run", run_name, "--policy", policy,
+        self.args = ["evaluate", "--project", str(project.path), "--policy", policy,
                      "--episodes", str(episodes), "--seed", str(seed), "--delay", str(delay)]
+        if run_name:
+            self.args += ["--run", run_name]
+        if identified:  # (dossier du rapport, id du modele)
+            self.args += ["--ident-dir", str(identified[0]), "--ident-model", str(identified[1])]
 
     def start(self):
         self.proc = _worker_process(self.settings, self.args, self)
@@ -190,9 +196,14 @@ class EvalRunner(TrainRunner):
                 ev = {}
             kind = ev.get("type")
             if kind == "step":
-                self.step.emit({"episode": ev["episode"], "step": ev["step"], "obs": np.asarray(ev["obs"]),
-                                "action": np.asarray(ev["action"]), "reward": ev["reward"], "total": ev["total"]})
+                s = {"episode": ev["episode"], "step": ev["step"], "obs": np.asarray(ev["obs"]),
+                     "action": np.asarray(ev["action"]), "reward": ev["reward"], "total": ev["total"]}
+                if ev.get("model") is not None:
+                    s["model"] = np.array([np.nan if v is None else v for v in ev["model"]], float)
+                self.step.emit(s)
                 return
+            if kind == "meta":
+                self.model_names.emit(list(ev.get("model_names") or []))
             if kind == "episode":
                 self.episode_done.emit(ev)
                 return

@@ -10,7 +10,7 @@ Protocole : une ligne JSON par evenement sur stdout ; la commande `stop` arrive 
   identify     --project DIR [--options JSON]   identifie un modele reduit (regime permanent ou dynamique), sans politique
   export-identify-simulink --project DIR --report NOM --candidate ID --out FICHIER.slx   modele reduit identifie -> bloc Simulink
   env-signals  --project DIR   actions (bornes) et observations de l'environnement du projet
-  evaluate     --project DIR --run NOM [--policy agent|distill:ID]   rejoue des episodes en direct
+  evaluate     --project DIR [--run NOM] [--policy agent|distill:ID|steps] [--ident-dir D --ident-model ID]   rejoue des episodes en direct
   distill      --project DIR --run NOM [--options JSON]   extrait un modele mathematique d'un run
   export-simulink --project DIR --run NOM --candidate ID --out FILE   controleur extrait -> modele Simulink
   analyze-model --model FILE [--init FILE]     analyse un modele Simulink existant (conversion)
@@ -224,10 +224,13 @@ def cmd_evaluate(args):
         if args.delay <= 0 and now - last[0] < 0.03:  # sans ralentissement : ~30 mises a jour par seconde
             return
         last[0] = now
+        extra = {} if s.get("model") is None else {"model": [None if not np.isfinite(v) else round(float(v), 5) for v in s["model"]]}
         emit(type="step", episode=s["episode"], step=s["step"], obs=np.asarray(s["obs"]).round(5).tolist(),
-             action=np.asarray(s["action"]).round(5).tolist(), reward=round(s["reward"], 5), total=round(s["total"], 5))
+             action=np.asarray(s["action"]).round(5).tolist(), reward=round(s["reward"], 5), total=round(s["total"], 5), **extra)
 
-    summary = run_evaluation(project, _run_dir(project, args.run), args.policy, args.episodes, args.seed, args.delay,
+    identified = (args.ident_dir, args.ident_model) if args.ident_dir and args.ident_model else None
+    run_dir = _run_dir(project, args.run) if args.run else None
+    summary = run_evaluation(project, run_dir, args.policy, args.episodes, args.seed, args.delay, identified=identified,
                              on_meta=lambda m: emit(type="meta", **m), on_step=on_step,
                              on_episode=lambda e: emit(type="episode", **e), should_stop=stop.is_set,
                              log=lambda m: emit(type="log", text=m))
@@ -390,8 +393,10 @@ def main(argv=None):
     p.add_argument("--project", required=True)
     p = sub.add_parser("evaluate")
     p.add_argument("--project", required=True)
-    p.add_argument("--run", required=True)
+    p.add_argument("--run", default="", help="entraînement à rejouer (inutile avec --policy steps)")
     p.add_argument("--policy", default="agent")
+    p.add_argument("--ident-dir", default="", help="dossier d'un rapport d'identification : son modèle est rejoué à côté du système")
+    p.add_argument("--ident-model", default="", help="identifiant du modèle identifié (ex. linear, poly-d2)")
     p.add_argument("--episodes", type=int, default=5)
     p.add_argument("--seed", type=int, default=1000)
     p.add_argument("--delay", type=float, default=0.0, help="pause par pas (s), pour suivre l'épisode à l'oeil")

@@ -232,6 +232,7 @@ class MainWindow(ProjectActions, ProjectTab, EnvTab, AlgoTab, TrainTab, RunsTab,
         for tab in (self.distill, self.identify, self.evaltab):
             tab.busy.connect(lambda b: self.plist.setEnabled(not b))
             tab.error.connect(self.report_error)
+        self.identify.busy.connect(lambda busy: None if busy else self.evaltab.refresh_models())  # un nouveau modèle identifié devient comparable
         self.tabs.insertTab(4, self.evaltab, "Évaluation")
         self.tabs.addTab(self.distill, "Modèle mathématique")
         self.tabs.addTab(self.identify, "Identification")
