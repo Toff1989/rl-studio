@@ -170,7 +170,8 @@ def steady_env(env, opts, name="env", out_dir=None, log=print, progress=None, sh
         if culprits:
             hint = (f" Les sorties {', '.join(culprits)} ne se stabilisent pas : ce sont sans doute des signaux qui dépendent du temps "
                     "(horloge, occupation, météo, perturbation) et non de l'entrée. Décochez-les dans « Sorties à modéliser » "
-                    "(option `outputs` en ligne de commande).")
+                    "(option `outputs` en ligne de commande). Si le système est instable ou oscille (pendule, par exemple), "
+                    "il n'a pas de régime permanent : utiliser le mode dynamique.")
         raise ValueError("Trop peu de points stabilisés : augmenter la durée max (`max_settle_steps`) ou assouplir `rtol` / `atol`." + hint)
 
     fits = []
