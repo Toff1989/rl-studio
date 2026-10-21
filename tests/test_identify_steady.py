@@ -167,3 +167,57 @@ def test_template_usine_identification_end_to_end(tmp_path):
     assert (d / "report.json").exists() and not (d / "sparse-t0.1" / "steady_state.m").exists()   # code non embarque
     from rlstudio.identify.pipeline import ensure_files
     assert (ensure_files(d, "sparse-t0.1") / "steady_state.m").exists()                            # ... mais regenere a la demande
+
+
+class PlantWithClock(Plant):
+    """Comme Plant, plus deux observations qui dépendent du temps seul (horloge, occupation) et ne se stabilisent jamais."""
+
+    obs_names = ["y1", "y2", "h_sin", "occupants"]
+    observation_space = types.SimpleNamespace(shape=(4,))
+
+    def reset(self, seed=None):
+        self.k = 0
+        y, info = super().reset(seed)
+        return self._with_clock(y), info
+
+    def _with_clock(self, y):
+        return np.r_[y, np.sin(0.05 * self.k), 5.0 + 0.5 * self.k]
+
+    def step(self, u):
+        self.k += 1
+        y, r, term, trunc, info = super().step(u)
+        return self._with_clock(y), r, term, trunc, info
+
+
+def test_time_dependent_observations_are_excluded_automatically():
+    """Cas du projet « Ventilation CO2 » : l'horloge et l'occupation ne se stabilisent pas ; seules les vraies sorties sont modélisées."""
+    logs = []
+    opts = SteadyOptions(samples=40, val_samples=10, methods=("linear", "polynomial"), poly_degrees=(3,), seed=1)
+    rep = steady_env(PlantWithClock(), opts, log=logs.append)
+    assert rep["out_names"] == ["y1", "y2"] and rep["excluded_outputs"] == ["h_sin", "occupants"] and rep["n_train"] == 40
+    assert any("h_sin" in m and "occupants" in m for m in logs) and any("écartées" in n for n in rep["notes"])
+
+
+def test_explicit_outputs_ignore_the_clock_without_probe():
+    opts = SteadyOptions(samples=20, val_samples=5, methods=("linear",), outputs=["y1"], seed=1)
+    rep = steady_env(PlantWithClock(), opts, log=lambda m: None)
+    assert rep["out_names"] == ["y1"] and rep["excluded_outputs"] == []
+
+
+class AllMoving(Plant):
+    def step(self, u):
+        self.k = getattr(self, "k", 0) + 1
+        return np.array([np.sin(self.k), np.cos(self.k)]), 0.0, False, False, {}
+
+
+def test_all_unsettled_gives_an_actionable_message():
+    opts = SteadyOptions(samples=10, val_samples=3, methods=("linear",), max_settle_steps=20)
+    with pytest.raises(ValueError, match="Trop peu de points stabilisés") as err:
+        steady_env(AllMoving(), opts, log=lambda m: None)
+    assert "y1, y2" in str(err.value) and "Sorties à modéliser" in str(err.value)
+
+
+def test_unsettled_blockers_are_named():
+    data = steady_sweep(PlantWithClock(), np.array([[0.0, 1.0]] * 3), 0, max_steps=60)
+    assert len(data) == 0 and data.blockers == {"h_sin": 3, "occupants": 3}
+    assert len(steady_sweep(PlantWithClock(), np.array([[0.0, 1.0]]), 0, max_steps=60, outputs=["y1", "y2"])) == 1

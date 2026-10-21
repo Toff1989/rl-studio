@@ -75,6 +75,28 @@ def run_steady(project, options: SteadyOptions | None = None, log=print, progres
             env.close()
 
 
+def action_independent(env, low, high, base, swept, seed, max_steps=None, n_steps=60):
+    """(noms des observations, masque) : vrai pour une observation strictement identique sous trois actions différentes, à départ égal."""
+    runs = []
+    for frac in (0.1, 0.5, 0.9):
+        u = np.array(base, float)
+        u[swept] = low + (high - low) * frac
+        obs, _ = env.reset(seed=int(seed))
+        traj = [np.asarray(obs, float).ravel()]
+        for _ in range(int(min(n_steps, max_steps or n_steps))):
+            obs, _r, terminated, truncated, _ = env.step(u.astype(np.float32))
+            traj.append(np.asarray(obs, float).ravel())
+            if terminated or truncated:
+                break
+        runs.append(np.array(traj))
+    names = list(getattr(env, "obs_names", None) or [f"y{i}" for i in range(runs[0].shape[1])])
+    n = min(len(r) for r in runs)
+    if n < 3:
+        return names, np.zeros(len(names), bool)
+    stack = np.stack([r[:n] for r in runs])
+    return names, np.all(np.abs(stack - stack[0]) <= 1e-9 + 1e-9 * np.abs(stack[0]), axis=(0, 1))
+
+
 def steady_env(env, opts, name="env", out_dir=None, log=print, progress=None, should_stop=None) -> dict:
     progress = progress or _noop
     rng = np.random.default_rng(opts.seed)
@@ -109,22 +131,47 @@ def steady_env(env, opts, name="env", out_dir=None, log=print, progress=None, sh
         done[0] += 1
         progress(stage, min(0.999, done[0] / total))
 
-    kw = dict(rtol=opts.rtol, atol=opts.atol, window=opts.window, max_steps=opts.max_settle_steps, scenario=opts.scenario, should_stop=should_stop, swept=swept, base=base)
+    kw = dict(rtol=opts.rtol, atol=opts.atol, window=opts.window, max_steps=opts.max_settle_steps, scenario=opts.scenario, should_stop=should_stop, swept=swept, base=base, outputs=opts.outputs)
+    outputs, excluded = opts.outputs, []
+    if not outputs:
+        # Une observation identique quelle que soit l'action (horloge, occupation, météo...) ne dépend pas de l'entrée : elle n'a pas de
+        # carte entrées -> sorties, et ne se stabilise pas toujours. On la repère en rejouant le même départ avec trois actions.
+        names_o, same = action_independent(env, low, high, base, swept, 50 + opts.seed, kw["max_steps"])
+        excluded = [n for n, s in zip(names_o, same) if s]
+        if excluded and len(excluded) < len(names_o):
+            outputs = [n for n in names_o if n not in excluded]
+            kw["outputs"] = outputs
+            log(f"Signaux indépendants de l'entrée (horloge, occupation, perturbation...), écartés des sorties à modéliser : {', '.join(excluded)}.")
+        else:
+            excluded = []
     log(f"Régime permanent : {opts.samples} point(s) d'apprentissage + {opts.val_samples} de validation (hypercube latin sur {len(low)} entrée(s) : {', '.join(names_a[i] for i in swept)}) ...")
     train = collect.steady_sweep(env, collect.latin_hypercube(rng, opts.samples, low, high, opts.extreme), 100 + opts.seed,
                                  on_point=lambda k, n: bump(f"Points d'apprentissage : {k}/{n}"), **kw)
     val = collect.steady_sweep(env, rng.uniform(low, high, (opts.val_samples, len(low))), 900_000 + opts.seed,
                                on_point=lambda k, n: bump(f"Points de validation : {k}/{n}"), **kw)
-    if opts.outputs:
-        bad = [n for n in opts.outputs if n not in train.obs_names]
+    if outputs:
+        bad = [n for n in outputs if n not in train.obs_names]
         if bad:
             raise ValueError(f"sorties inconnues : {bad} (observations disponibles : {train.obs_names})")
-        train.select_outputs(opts.outputs)
-        val.select_outputs(opts.outputs)
+        train.select_outputs(outputs)
+        val.select_outputs(outputs)
     dropped = train.dropped + val.dropped
-    log(f"  {len(train)} + {len(val)} points stabilisés (en moyenne {np.mean(train.steps + val.steps):.1f} pas), {dropped} écarté(s) faute de convergence")
+    mean_steps = f"{np.mean(train.steps + val.steps):.1f}" if train.steps + val.steps else "-"
+    log(f"  {len(train)} + {len(val)} points stabilisés (en moyenne {mean_steps} pas), {dropped} écarté(s) faute de convergence")
+    blockers = {}
+    for d in (train, val):
+        for n, c in d.blockers.items():
+            blockers[n] = blockers.get(n, 0) + c
+    culprits = [n for n, c in sorted(blockers.items(), key=lambda kv: -kv[1]) if c >= 0.5 * dropped] if dropped else []
+    if culprits and not outputs:
+        log(f"  signaux qui bougeaient encore à la fin de la plupart des points écartés : {', '.join(culprits)}")
     if len(train) < 5 or len(val) < 2:
-        raise ValueError("Trop peu de points stabilisés : augmenter la durée max (`max_settle_steps`) ou assouplir `rtol` / `atol`.")
+        hint = ""
+        if culprits:
+            hint = (f" Les sorties {', '.join(culprits)} ne se stabilisent pas : ce sont sans doute des signaux qui dépendent du temps "
+                    "(horloge, occupation, météo, perturbation) et non de l'entrée. Décochez-les dans « Sorties à modéliser » "
+                    "(option `outputs` en ligne de commande).")
+        raise ValueError("Trop peu de points stabilisés : augmenter la durée max (`max_settle_steps`) ou assouplir `rtol` / `atol`." + hint)
 
     fits = []
     for m in opts.methods:
@@ -159,12 +206,15 @@ def steady_env(env, opts, name="env", out_dir=None, log=print, progress=None, sh
         notes.append(f"{dropped} point(s) n'ont pas convergé (instabilité, oscillation entretenue ou durée trop courte) : le modèle ne les représente pas.")
     if max(train.steps) >= (opts.max_settle_steps or 10 ** 9) * 0.9:
         notes.append("Certains points convergent à la limite de durée : augmenter `max_settle_steps` pour éviter des sorties non stabilisées.")
+    if excluded:
+        notes.append(f"Sorties écartées car elles ne dépendent pas de l'entrée : {', '.join(excluded)} (horloge, occupation, météo ou perturbation). "
+                     "Pour les prendre en compte, en faire des entrées (option « perturbations comme entrées » si elles sont tirées au départ).")
     notes.append("Le modèle n'est valable que dans le domaine des entrées balayées (les polynômes et le réseau extrapolent mal au-dela).")
     notes.append("Si plusieurs régimes permanents existent pour une même entrée (hystérésis, bistabilité), la sortie dépend de l'histoire : "
                  "le modèle statique en donne une moyenne. Ajouter l'état en cause comme entrée.")
     report = {"mode": "steady", "version": __version__, "created": time.strftime("%Y-%m-%d %H:%M"), "project": name, "out_names": train.obs_names,
               "in_names": train.act_names, "options": asdict(opts), "n_train": len(train), "n_val": len(val), "dropped": dropped,
-              "mean_settle_steps": float(np.mean(train.steps)), "candidates": candidates, "recommended": recommended, "notes": notes,
+              "excluded_outputs": excluded, "mean_settle_steps": float(np.mean(train.steps)), "candidates": candidates, "recommended": recommended, "notes": notes,
               "duration_s": round(time.time() - t0, 1)}
     if out_dir:
         report["dir"] = str(out_dir)

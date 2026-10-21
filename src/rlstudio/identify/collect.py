@@ -102,6 +102,7 @@ class SteadyData:
         self.Y: list[np.ndarray] = []
         self.steps: list[int] = []
         self.dropped = 0
+        self.blockers: dict[str, int] = {}  # sortie -> nombre de points ecartes ou elle bougeait encore
 
     @property
     def n_in(self):
@@ -125,7 +126,7 @@ class SteadyData:
 
     def copy(self):
         d = SteadyData(self.obs_names, self.act_names, self.low, self.high)
-        d.U, d.Y, d.steps, d.dropped = list(self.U), list(self.Y), list(self.steps), self.dropped
+        d.U, d.Y, d.steps, d.dropped, d.blockers = list(self.U), list(self.Y), list(self.steps), self.dropped, dict(self.blockers)
         return d
 
     def extend(self, other):
@@ -133,6 +134,8 @@ class SteadyData:
         self.Y += other.Y
         self.steps += other.steps
         self.dropped += other.dropped
+        for n, c in other.blockers.items():
+            self.blockers[n] = self.blockers.get(n, 0) + c
 
     def __len__(self):
         return len(self.U)
@@ -149,12 +152,15 @@ def latin_hypercube(rng, n, low, high, extreme=0.15):
 
 
 def steady_sweep(env, design, seed0, rtol=1e-3, atol=1e-6, window=3, max_steps=None, scenario=False, should_stop=None, on_point=None,
-                 swept=None, base=None):
+                 swept=None, base=None, outputs=None):
     """Pour chaque ligne de `design`, maintient l'action constante jusqu'a convergence des sorties (|dy| <= atol + rtol.|y| pendant
     `window` pas consecutifs) et releve la sortie. Les points qui ne convergent pas sont ecartes (compteur `dropped`).
 
     `scenario=True` : les variables tirees au `reset` (cle `initial` d'un projet Simulink : perturbations) deviennent des entrees.
-    `swept` : indices des actions balayees (colonnes de `design`) ; `base` : vecteur d'action complet dont les autres composantes sont fixees."""
+    `swept` : indices des actions balayees (colonnes de `design`) ; `base` : vecteur d'action complet dont les autres composantes sont fixees.
+    `outputs` : noms des seules sorties dont la stabilisation est exigee (defaut : toutes). Une observation qui ne depend pas de l'action
+    (horloge, occupation, meteo...) ne se stabilise jamais : elle doit etre exclue, sinon aucun point n'est retenu ; les points ecartes
+    memorisent dans `data.blockers` quelles sorties les ont empeches de converger."""
     env_low, env_high = np.asarray(env.action_space.low, float), np.asarray(env.action_space.high, float)
     swept = list(range(len(env_low))) if swept is None else list(swept)
     base = np.asarray(base if base is not None else (env_low + env_high) / 2.0, float)
@@ -162,6 +168,12 @@ def steady_sweep(env, design, seed0, rtol=1e-3, atol=1e-6, window=3, max_steps=N
     names_o = getattr(env, "obs_names", None) or [f"y{i}" for i in range(int(np.prod(env.observation_space.shape)))]
     names_a = list(getattr(env, "action_names", None) or [f"u{i}" for i in range(len(env_low))])
     names_a = [names_a[i] for i in swept]
+    watch = list(range(len(names_o)))
+    if outputs:
+        bad = [n for n in outputs if n not in names_o]
+        if bad:
+            raise ValueError(f"sorties inconnues : {bad} (observations disponibles : {names_o})")
+        watch = [names_o.index(n) for n in outputs]
     horizon = int(max_steps or getattr(env, "n_steps", None) or getattr(env, "max_steps", None) or 200)
     data, extra_names = None, []
     for k, u in enumerate(np.clip(design, low, high)):
@@ -175,11 +187,13 @@ def steady_sweep(env, design, seed0, rtol=1e-3, atol=1e-6, window=3, max_steps=N
             extra_names = sorted(extra)
             data = SteadyData(names_o, names_a + extra_names, np.r_[low, [-np.inf] * len(extra_names)], np.r_[high, [np.inf] * len(extra_names)])
         prev, calm, steps, settled = np.asarray(obs, float).ravel(), 0, 0, False
+        moving = np.ones(len(watch), bool)  # sorties surveillees qui bougeaient encore au dernier pas
         while steps < horizon:
             obs, _r, terminated, truncated, _ = env.step(np.asarray(u_full, np.float32))
             y = np.asarray(obs, float).ravel()
             steps += 1
-            calm = calm + 1 if np.all(np.abs(y - prev) <= atol + rtol * np.abs(y)) else 0
+            moving = np.abs(y - prev)[watch] > atol + rtol * np.abs(y)[watch]
+            calm = calm + 1 if not moving.any() else 0
             prev = y
             if calm >= window:
                 settled = True
@@ -190,6 +204,9 @@ def steady_sweep(env, design, seed0, rtol=1e-3, atol=1e-6, window=3, max_steps=N
             data.add(np.r_[u, [extra[n] for n in extra_names]], prev, steps)
         else:
             data.dropped += 1
+            for j in np.flatnonzero(moving):
+                n = names_o[watch[j]]
+                data.blockers[n] = data.blockers.get(n, 0) + 1
         if on_point:
             on_point(k + 1, len(design))
     if data is None:
