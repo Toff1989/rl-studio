@@ -19,17 +19,17 @@ from .runner import IdentifyRunner, RuntimeMissing, WorkerJob
 from .theme import C
 from .widgets import Card, button, label, scroll_page
 
-MODES = [("steady", "Regime permanent : entrees -> sorties  (y = f(u))"), ("dynamic", "Dynamique : x(k+1) = x(k) + f(x, u)")]
-IN_COLS = ["Balayer", "Entree", "Min", "Max", "Valeur fixee"]
-STEADY_COLS = ["Modele", "Complexite", "R2", "NRMSE", "Erreur max", ""]
-DYN_COLS = ["Modele", "Complexite", "R2 un pas", "Fidelite sim. libre", "NRMSE", ""]
+MODES = [("steady", "Régime permanent : entrées -> sorties  (y = f(u))"), ("dynamic", "Dynamique : x(k+1) = x(k) + f(x, u)")]
+IN_COLS = ["Balayer", "Entrée", "Min", "Max", "Valeur fixée"]
+STEADY_COLS = ["Modèle", "Complexité", "R2", "NRMSE", "Erreur max", ""]
+DYN_COLS = ["Modèle", "Complexité", "R2 un pas", "Fidélité sim. libre", "NRMSE", ""]
 
 
 def _floats(text, what):
     try:
         out = [float(t) for t in text.replace(";", ",").split(",") if t.strip()]
     except ValueError:
-        raise ValueError(f"{what} : liste de nombres separes par des virgules attendue.") from None
+        raise ValueError(f"{what} : liste de nombres séparés par des virgules attendue.") from None
     if not out:
         raise ValueError(f"{what} : au moins une valeur.")
     return out
@@ -95,8 +95,8 @@ class IdentifyTab(QWidget):
         self.s_atol = _spin(0, 1000, 0.000001, 9)
         self.s_window = _spin(1, 100, 3)
         self.s_settle = _spin(0, 1000000, 0)
-        self.s_settle.setSpecialValueText("duree d'un episode")
-        self.s_scenario = QCheckBox("Variables `initial` (perturbations) = entrees du modele")
+        self.s_settle.setSpecialValueText("durée d'un épisode")
+        self.s_scenario = QCheckBox("Variables `initial` (perturbations) = entrées du modèle")
         self.d_episodes = _spin(2, 100000, 40)
         self.d_val = _spin(2, 100000, 10)
         self.d_rounds = _spin(0, 50, 0)
@@ -104,7 +104,7 @@ class IdentifyTab(QWidget):
         self.d_hold = _spin(1, 1000, 10)
         self.d_extreme = _spin(0, 100, 20, 0, " %")
         self.d_maxsteps = _spin(0, 1000000, 0)
-        self.d_maxsteps.setSpecialValueText("duree d'un episode")
+        self.d_maxsteps.setSpecialValueText("durée d'un épisode")
         # modeles
         self.f_poly = QLineEdit("2, 3")
         self.f_sparse = QLineEdit("0.3, 0.1, 0.03")
@@ -112,26 +112,26 @@ class IdentifyTab(QWidget):
         self.f_epochs = _spin(1, 100000, 400)
         self.f_margin = _spin(0, 50, 2, 1, " %")
         self.f_seed = _spin(0, 10 ** 6, 0)
-        self.f_poly.setToolTip("Degres des polynomes testes (un modele par degre)")
-        self.f_sparse.setToolTip("Seuils de la regression parcimonieuse (SINDy) : plus grand = moins de termes")
-        self.f_hidden.setToolTip("Neurones par couche cachee du reseau (tanh)")
+        self.f_poly.setToolTip("Degrés des polynômes testés (un modèle par degré)")
+        self.f_sparse.setToolTip("Seuils de la régression parcimonieuse (SINDy) : plus grand = moins de termes")
+        self.f_hidden.setToolTip("Neurones par couche cachée du réseau (tanh)")
 
-        self.steady_box = self._grid_card("Balayage en regime permanent", [
+        self.steady_box = self._grid_card("Balayage en régime permanent", [
             ("Points d'apprentissage", self.s_samples), ("Points de validation", self.s_val), ("Part aux bornes", self.s_extreme),
             ("Stabilisation : tol. relative", self.s_rtol), ("Stabilisation : tol. absolue", self.s_atol), ("Pas consecutifs stables", self.s_window),
-            ("Duree max d'etablissement (pas)", self.s_settle)], extra=self.s_scenario,
-            hint="Chaque point est simule, entrees constantes, jusqu'a stabilisation des sorties ; les points qui ne convergent pas sont ecartes.")
+            ("Durée max d'établissement (pas)", self.s_settle)], extra=self.s_scenario,
+            hint="Chaque point est simulé, entrées constantes, jusqu'à stabilisation des sorties ; les points qui ne convergent pas sont écartés.")
         self.dyn_box = self._grid_card("Balayage dynamique", [
-            ("Episodes d'apprentissage", self.d_episodes), ("Episodes de validation", self.d_val), ("Tours de collecte en plus", self.d_rounds),
-            ("Episodes / tour", self.d_round_eps), ("Palier max (pas)", self.d_hold), ("Part aux bornes", self.d_extreme),
-            ("Pas max / episode", self.d_maxsteps)],
-            hint="Paliers d'action aleatoires de duree variable ; validation en simulation libre sur des episodes jamais vus.")
-        models = self._grid_card("Modeles", [
-            ("Degres du polynome", self.f_poly), ("Seuils parcimonieux (SINDy)", self.f_sparse), ("Couches cachees (reseau)", self.f_hidden),
-            ("Epoques (reseau)", self.f_epochs), ("Tolerance de recommandation", self.f_margin), ("Graine", self.f_seed)])
+            ("Épisodes d'apprentissage", self.d_episodes), ("Épisodes de validation", self.d_val), ("Tours de collecte en plus", self.d_rounds),
+            ("Épisodes / tour", self.d_round_eps), ("Palier max (pas)", self.d_hold), ("Part aux bornes", self.d_extreme),
+            ("Pas max / épisode", self.d_maxsteps)],
+            hint="Paliers d'action aléatoires de durée variable ; validation en simulation libre sur des épisodes jamais vus.")
+        models = self._grid_card("Modèles", [
+            ("Degrés du polynôme", self.f_poly), ("Seuils parcimonieux (SINDy)", self.f_sparse), ("Couches cachées (réseau)", self.f_hidden),
+            ("Époques (réseau)", self.f_epochs), ("Tolérance de recommandation", self.f_margin), ("Graine", self.f_seed)])
 
-        self.btn_start = button("Identifier le modele", "primary", self._start)
-        self.btn_stop = button("Arreter", None, self._stop)
+        self.btn_start = button("Identifier le modèle", "primary", self._start)
+        self.btn_stop = button("Arrêter", None, self._stop)
         self.btn_stop.setEnabled(False)
         self.progress = QProgressBar()
         self.progress.setRange(0, 1000)
@@ -154,18 +154,18 @@ class IdentifyTab(QWidget):
         row.addWidget(self.btn_stop)
         row.addWidget(self.progress, 1)
 
-        cfg = Card("Identification", "Sans politique ni entrainement : le modele (Simulink ou Python) est balaye puis remplace par des equations ou un "
-                   "reseau de neurones, valides sur des points ou des episodes jamais vus.")
+        cfg = Card("Identification", "Sans politique ni entraînement : le modèle (Simulink ou Python) est balayé puis remplacé par des équations ou un "
+                   "réseau de neurones, validés sur des points ou des épisodes jamais vus.")
         top = QHBoxLayout()
         top.addWidget(label("Mode", "sectionLabel"))
         top.addWidget(self.mode, 1)
         cfg.body.addLayout(top)
-        cfg.body.addWidget(label("Familles de modeles", "sectionLabel"))
+        cfg.body.addWidget(label("Familles de modèles", "sectionLabel"))
         cfg.body.addLayout(meth)
 
-        ins = Card("Entrees (actions)", "Decocher une entree pour la maintenir a une valeur fixe ; modifier Min / Max pour restreindre la plage balayee.")
+        ins = Card("Entrées (actions)", "Décocher une entrée pour la maintenir à une valeur fixe ; modifier Min / Max pour restreindre la plage balayée.")
         ins.body.addWidget(self.in_table)
-        self.outs_label = label("Sorties a modeliser (observations)", "sectionLabel")
+        self.outs_label = label("Sorties à modéliser (observations)", "sectionLabel")
         ins.body.addWidget(self.outs_label)
         ins.body.addWidget(self.out_list)
         ins.body.addWidget(self.btn_read, 0, Qt.AlignLeft)
@@ -214,7 +214,7 @@ class IdentifyTab(QWidget):
         for b in (self.btn_copy_py, self.btn_copy_m, self.btn_save, self.btn_slx, self.btn_open):
             actions.addWidget(b)
         actions.addStretch()
-        res = Card("Resultats")
+        res = Card("Résultats")
         top2 = QHBoxLayout()
         top2.addWidget(label("Identification", "sectionLabel"))
         top2.addWidget(self.result_combo, 1)
@@ -223,7 +223,7 @@ class IdentifyTab(QWidget):
         res.body.addWidget(self.summary)
         res.body.addWidget(self.table)
         res.body.addLayout(plots)
-        res.body.addWidget(label("Equations / description du modele selectionne", "sectionLabel"))
+        res.body.addWidget(label("Équations / description du modèle sélectionné", "sectionLabel"))
         res.body.addWidget(self.equations)
         res.body.addLayout(actions)
         res.body.addWidget(self.notes)
@@ -340,13 +340,13 @@ class IdentifyTab(QWidget):
         steady = self.current_mode() == "steady"
         methods = [m for m, cb in self.method_boxes.items() if cb.isChecked()]
         if not methods:
-            raise ValueError("Coche au moins une famille de modeles.")
-        o = {"mode": self.current_mode(), "methods": methods, "poly_degrees": [int(v) for v in _floats(self.f_poly.text(), "Degres du polynome")],
+            raise ValueError("Coche au moins une famille de modèles.")
+        o = {"mode": self.current_mode(), "methods": methods, "poly_degrees": [int(v) for v in _floats(self.f_poly.text(), "Degrés du polynôme")],
              "sparse_thresholds": _floats(self.f_sparse.text(), "Seuils parcimonieux"),
-             "hidden": [int(v) for v in _floats(self.f_hidden.text(), "Couches cachees")], "epochs": self.f_epochs.value(),
+             "hidden": [int(v) for v in _floats(self.f_hidden.text(), "Couches cachées")], "epochs": self.f_epochs.value(),
              "margin": self.f_margin.value() / 100.0, "seed": self.f_seed.value()}
         if min(o["poly_degrees"]) < 1 or min(o["hidden"]) < 1 or min(o["sparse_thresholds"]) <= 0:
-            raise ValueError("Degres, neurones et seuils doivent etre positifs.")
+            raise ValueError("Degrés, neurones et seuils doivent être positifs.")
         if steady:
             o.update(samples=self.s_samples.value(), val_samples=self.s_val.value(), extreme=self.s_extreme.value() / 100.0,
                      rtol=self.s_rtol.value() / 100.0, atol=self.s_atol.value(), window=self.s_window.value(),
@@ -362,21 +362,21 @@ class IdentifyTab(QWidget):
             try:
                 lo, hi, val = (float(self.in_table.item(r, c).text().replace(",", ".")) for c in (2, 3, 4))
             except ValueError:
-                raise ValueError(f"Entree {name} : Min, Max et Valeur fixee doivent etre des nombres.") from None
+                raise ValueError(f"Entree {name} : Min, Max et Valeur fixée doivent être des nombres.") from None
             if self.in_table.item(r, 0).checkState() == Qt.Checked:
                 if not lo < hi:
-                    raise ValueError(f"Entree {name} : Min doit etre inferieur a Max.")
+                    raise ValueError(f"Entree {name} : Min doit être inférieur à Max.")
                 if (lo, hi) != (lo0, hi0):
                     ranges[name] = [lo, hi]
             else:
                 fixed[name] = val
         if self.signals and len(fixed) == self.in_table.rowCount() and fixed:
-            raise ValueError("Toutes les entrees sont fixees : il n'y a rien a balayer.")
+            raise ValueError("Toutes les entrées sont fixées : il n'y a rien à balayer.")
         o["ranges"], o["fixed"] = ranges, fixed
         if steady and self.out_list.count():
             checked = [self.out_list.item(i).text() for i in range(self.out_list.count()) if self.out_list.item(i).checkState() == Qt.Checked]
             if not checked:
-                raise ValueError("Coche au moins une sortie a modeliser.")
+                raise ValueError("Coche au moins une sortie à modéliser.")
             if len(checked) < self.out_list.count():
                 o["outputs"] = checked
         return o
@@ -472,7 +472,7 @@ class IdentifyTab(QWidget):
         self.status.setText("")
         self.logbox.clear()
         self.logbox.show()
-        self.stage.setText("Demarrage du processus de calcul ...")
+        self.stage.setText("Démarrage du processus de calcul ...")
         self._t0, self._fraction = time.monotonic(), 0.0
         self._tick()
         self.clock.start()
@@ -481,7 +481,7 @@ class IdentifyTab(QWidget):
     def _stop(self):
         if self.runner:
             self.runner.stop()
-            self.stage.setText("Arret...")
+            self.stage.setText("Arrêt...")
 
     def _on_log(self, text):
         self.logbox.appendPlainText(text.rstrip())
@@ -500,7 +500,7 @@ class IdentifyTab(QWidget):
         if self._t0 is None:
             return
         elapsed = time.monotonic() - self._t0
-        text = f"Ecoule : {self._fmt(elapsed)}"
+        text = f"Écoulé : {self._fmt(elapsed)}"
         if self._fraction > 0.03:
             text += f"   ·   reste environ {self._fmt(elapsed * (1 - self._fraction) / self._fraction)}"
         self.timing.setText(text)
@@ -516,13 +516,13 @@ class IdentifyTab(QWidget):
         self.btn_start.setEnabled(self.project is not None)
         self.busy.emit(False)
         self.stage.setText("")
-        self.timing.setText(f"Duree : {self._fmt(elapsed)}")
+        self.timing.setText(f"Durée : {self._fmt(elapsed)}")
         if message.startswith("ERREUR"):
             self.logbox.appendPlainText(message)
-            self.status.setText("Echec de l'identification : voir le journal ci-dessus.")
+            self.status.setText("Échec de l'identification : voir le journal ci-dessus.")
             return
-        self.status.setText("Identification terminee." if message.startswith("Termine") else "Identification arretee.")
-        if message.startswith("Termine"):
+        self.status.setText("Identification terminée." if message.startswith("Terminé") else "Identification arrêtée.")
+        if message.startswith("Terminé"):
             self.progress.setValue(1000)
             self._refresh_results(select_latest=True)
 
@@ -535,7 +535,7 @@ class IdentifyTab(QWidget):
         for d in dirs:
             try:
                 rep = json.loads((d / "report.json").read_text(encoding="utf-8-sig"))
-                kind = "regime permanent" if rep.get("mode") == "steady" else "dynamique"
+                kind = "régime permanent" if rep.get("mode") == "steady" else "dynamique"
             except ValueError:
                 continue
             self.result_combo.addItem(f"{d.name[6:8]}/{d.name[4:6]}/{d.name[:4]}  {d.name[9:11]}:{d.name[11:13]}  -  {kind}", str(d))
@@ -573,7 +573,7 @@ class IdentifyTab(QWidget):
         self.table.setColumnCount(len(cols))
         self.table.setHorizontalHeaderLabels(cols)
         if steady:
-            self.summary.setText(f"{rep['n_train']} points d'apprentissage, {rep['n_val']} de validation, {rep['dropped']} ecarte(s) ; entrees : "
+            self.summary.setText(f"{rep['n_train']} points d'apprentissage, {rep['n_val']} de validation, {rep['dropped']} ecarte(s) ; entrées : "
                                  f"{', '.join(rep['in_names'])} ; sorties : {', '.join(rep['out_names'])}. Du {rep['created']} ({rep['duration_s']:.0f} s).")
         else:
             self.summary.setText(f"{rep['n_train']} transitions d'apprentissage, {rep['n_val']} de validation, pas de temps {rep['dt']:g} s. "
@@ -622,8 +622,8 @@ class IdentifyTab(QWidget):
             return
         rep, sel, steady = self.report, self._candidate(), self._steady()
         txt = C["muted"]
-        self.pareto.setLabel("bottom", "Complexite (termes ou parametres, echelle log)", color=txt)
-        self.pareto.setLabel("left", "R2 (points neufs)" if steady else "Fidelite en simulation libre", color=txt)
+        self.pareto.setLabel("bottom", "Complexité (termes ou paramètres, échelle log)", color=txt)
+        self.pareto.setLabel("left", "R2 (points neufs)" if steady else "Fidélité en simulation libre", color=txt)
         xs = [np.log10(max(c["complexity"], 1)) for c in rep["candidates"]]
         ys = [max(self._score(c), -0.2) for c in rep["candidates"]]
         brushes = [pg.mkBrush(C["success"] if c["id"] == rep["recommended"] else C["accent"]) for c in rep["candidates"]]
@@ -638,8 +638,8 @@ class IdentifyTab(QWidget):
             return
         if steady:
             pts = np.asarray(sel.get("scatter", {}).get(self.plot_out.currentText(), []))
-            self.detail.setLabel("bottom", "Sortie du systeme", color=txt)
-            self.detail.setLabel("left", "Sortie du modele", color=txt)
+            self.detail.setLabel("bottom", "Sortie du système", color=txt)
+            self.detail.setLabel("left", "Sortie du modèle", color=txt)
             if len(pts):
                 lo, hi = float(pts.min()), float(pts.max())
                 self.detail.addItem(pg.PlotDataItem([lo, hi], [lo, hi], pen=pg.mkPen(C["warning"], style=Qt.DashLine, width=1.5)))
@@ -647,7 +647,7 @@ class IdentifyTab(QWidget):
         else:
             hs = sel.get("nrmse_by_horizon", {})
             self.detail.setLabel("bottom", "Horizon de prediction (pas)", color=txt)
-            self.detail.setLabel("left", "Erreur normalisee (NRMSE)", color=txt)
+            self.detail.setLabel("left", "Erreur normalisée (NRMSE)", color=txt)
             if hs:
                 x = [float(h) for h in hs]
                 self.detail.addItem(pg.PlotDataItem(np.log10(x), list(hs.values()), pen=pg.mkPen(C["accent"], width=2), symbol="o", symbolSize=7,
@@ -681,8 +681,8 @@ class IdentifyTab(QWidget):
         c = self._candidate()
         if not c:
             return
-        target, _ = QFileDialog.getSaveFileName(self, "Enregistrer le modele", f"{c['id'].replace('-', '_')}.py",
-                                                "Python (*.py);;MATLAB (*.m);;Equations (*.txt);;JSON (*.json)")
+        target, _ = QFileDialog.getSaveFileName(self, "Enregistrer le modèle", f"{c['id'].replace('-', '_')}.py",
+                                                "Python (*.py);;MATLAB (*.m);;Équations (*.txt);;JSON (*.json)")
         if not target:
             return
         src = {".py": self._stem() + ".py", ".m": self._stem() + ".m", ".txt": "equations.txt", ".json": "model.json"}.get(Path(target).suffix.lower())
@@ -694,23 +694,23 @@ class IdentifyTab(QWidget):
         if src.endswith(".m"):  # MATLAB exige que le nom de fonction == nom de fichier
             text = text.replace(self._stem(), Path(target).stem)
         Path(target).write_text(text, encoding="utf-8")
-        self.status.setText(f"Enregistre : {target}")
+        self.status.setText(f"Enregistré : {target}")
 
     def _export_simulink(self):
         c = self._candidate()
         if not c or not self.report_dir or not self.project:
             return
         suggestion = f"{'regime_permanent' if self._steady() else 'dynamique'}_{c['id'].replace('-', '_').replace('.', '_')}.slx"
-        target, _ = QFileDialog.getSaveFileName(self, "Modele Simulink", suggestion, "Modele Simulink (*.slx)")
+        target, _ = QFileDialog.getSaveFileName(self, "Modèle Simulink", suggestion, "Modèle Simulink (*.slx)")
         if not target:
             return
         args = ["export-identify-simulink", "--project", str(self.project.path), "--report", self.report_dir.name, "--candidate", c["id"],
                 "--out", target]
         self.job = WorkerJob(self.settings, args, self)
-        self.job.done.connect(lambda res, err: self.status.setText(f"Modele Simulink cree : {res['path']}" if res else f"ERREUR : {err}"))
+        self.job.done.connect(lambda res, err: self.status.setText(f"Modèle Simulink créé : {res['path']}" if res else f"ERREUR : {err}"))
         self.job.done.connect(lambda *_: self.btn_slx.setEnabled(True))
         self.btn_slx.setEnabled(False)
-        self.status.setText("Generation du modele Simulink (demarrage de MATLAB) ...")
+        self.status.setText("Génération du modèle Simulink (démarrage de MATLAB) ...")
         self.job.start()
 
     def _open_dir(self):

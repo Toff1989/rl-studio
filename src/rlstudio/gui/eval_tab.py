@@ -31,15 +31,15 @@ class EvalTab(QWidget):
         for txt, _ in SPEEDS:
             self.speed.addItem(txt)
         self.speed.setCurrentIndex(2)
-        self.btn_start = button("▶  Lancer l'evaluation", "primary", self._start)
-        self.btn_stop = button("■  Arreter", "danger", self._stop)
+        self.btn_start = button("▶  Lancer l'évaluation", "primary", self._start)
+        self.btn_stop = button("■  Arrêter", "danger", self._stop)
         self.btn_stop.setEnabled(False)
-        self.status = label("Choisis un run entraine.", "muted", wrap=True)
+        self.status = label("Choisis un run entraîné.", "muted", wrap=True)
 
         form = QGridLayout()
         form.setHorizontalSpacing(14)
         for i, (txt, w, span) in enumerate([("Run", self.run_combo, 1), ("Politique", self.policy_combo, 1),
-                                            ("Episodes", self.f_episodes, 1), ("Graine", self.f_seed, 1), ("Vitesse", self.speed, 1)]):
+                                            ("Épisodes", self.f_episodes, 1), ("Graine", self.f_seed, 1), ("Vitesse", self.speed, 1)]):
             form.addWidget(label(txt, "sectionLabel"), 0, i)
             form.addWidget(w, 1, i)
         form.setColumnStretch(0, 2)
@@ -48,20 +48,20 @@ class EvalTab(QWidget):
         bar.addWidget(self.btn_start)
         bar.addWidget(self.btn_stop)
         bar.addWidget(self.status, 1)
-        cfg = Card("Evaluation d'un modele", "Rejoue des episodes avec la politique deterministe (sans bruit d'exploration) et "
-                   "trace les observations et les actions pas a pas. Peut aussi rejouer un modele mathematique extrait.")
+        cfg = Card("Évaluation d'un modèle", "Rejoue des épisodes avec la politique déterministe (sans bruit d'exploration) et "
+                   "trace les observations et les actions pas à pas. Peut aussi rejouer un modèle mathématique extrait.")
         cfg.body.addLayout(form)
         cfg.body.addLayout(bar)
 
-        self.k_ep, self.k_step, self.k_ret, self.k_mean = Kpi("Episode"), Kpi("Pas"), Kpi("Retour en cours"), Kpi("Retour moyen")
+        self.k_ep, self.k_step, self.k_ret, self.k_mean = Kpi("Épisode"), Kpi("Pas"), Kpi("Retour en cours"), Kpi("Retour moyen")
         kpis = QHBoxLayout()
         for k in (self.k_ep, self.k_step, self.k_ret, self.k_mean):
             kpis.addWidget(k, 1)
 
         self.p_obs = SeriesPlot("Observations", "pas")
         self.p_act = SeriesPlot("Actions", "pas")
-        self.p_cum = SeriesPlot("Recompense cumulee", "pas")
-        self.p_cum.set_names(["recompense cumulee"])
+        self.p_cum = SeriesPlot("Récompense cumulée", "pas")
+        self.p_cum.set_names(["récompense cumulée"])
         self.p_ret = pg.PlotWidget()
         self.p_ret.setObjectName("plot")
         self.p_ret.showGrid(x=True, y=True, alpha=0.12)
@@ -100,7 +100,7 @@ class EvalTab(QWidget):
             p.restyle()
         if "surface" in C:
             self.p_ret.setBackground(C["surface"])
-            self.p_ret.setTitle("Retour par episode", color=C["text"], size="11pt")
+            self.p_ret.setTitle("Retour par épisode", color=C["text"], size="11pt")
             for ax in ("left", "bottom"):
                 self.p_ret.getAxis(ax).setPen(C["border2"])
                 self.p_ret.getAxis(ax).setTextPen(C["muted"])
@@ -117,7 +117,7 @@ class EvalTab(QWidget):
         self.run_combo.blockSignals(False)
         self._fill_policies()
         self.btn_start.setEnabled(bool(runs) and self.runner is None)
-        self.status.setText("Pret." if runs else "Aucun run avec modele : entraine le projet d'abord.")
+        self.status.setText("Prêt." if runs else "Aucun run avec modèle : entraîne le projet d'abord.")
 
     def _fill_policies(self, *_):
         self.policy_combo.clear()
@@ -164,13 +164,13 @@ class EvalTab(QWidget):
         for w in (self.btn_start, self.run_combo, self.policy_combo):
             w.setEnabled(False)
         self.btn_stop.setEnabled(True)
-        self.status.setText("Evaluation en cours ...")
+        self.status.setText("Évaluation en cours ...")
         self.busy.emit(True)
 
     def _stop(self):
         if self.runner:
             self.runner.stop()
-            self.status.setText("Arret...")
+            self.status.setText("Arrêt...")
 
     def _on_meta(self, obs_names, act_names):
         self.p_obs.set_names(obs_names)
@@ -193,7 +193,7 @@ class EvalTab(QWidget):
         self.bars.setOpts(x=np.arange(1, len(self.returns) + 1), height=self.returns)
         self.k_mean.set(f"{np.mean(self.returns):.2f}")
         self.logbox.appendPlainText(f"Episode {ev['n']} : retour {ev['reward']:.3f}, {ev['length']} pas"
-                                    + (" (arret anticipe)" if ev.get("terminated") else ""))
+                                    + (" (arrêt anticipé)" if ev.get("terminated") else ""))
 
     def _on_finished(self, message):
         self.runner = None
@@ -202,4 +202,4 @@ class EvalTab(QWidget):
         self.btn_stop.setEnabled(False)
         self.busy.emit(False)
         self.status.setText(message[:400] if message.startswith("ERREUR") else
-                            "Evaluation terminee." if message.startswith("Termine") else "Evaluation arretee.")
+                            "Évaluation terminée." if message.startswith("Terminé") else "Évaluation arrêtée.")

@@ -1,7 +1,7 @@
-template_name: Usine non lineaire (identification)
-template_description: "Banc d'essai de l'onglet Identification : usine Python a 2 entrees et 2 sorties (saturation, terme quadratique, sin, valeur absolue) a dynamique lente. Sert aussi de modele a remplacer par un modele reduit."
-name: Usine non lineaire
-description: Deux entrees (u1, u2), deux sorties (y1, y2), regime permanent connu en formules (voir env.py) ; premier ordre, constante de temps ~3 pas.
+template_name: Usine non linéaire (identification)
+template_description: "Banc d'essai de l'onglet Identification : usine Python à 2 entrées et 2 sorties (saturation, terme quadratique, sin, valeur absolue) à dynamique lente. Sert aussi de modèle à remplacer par un modèle réduit."
+name: Usine non linéaire
+description: Deux entrées (u1, u2), deux sorties (y1, y2), régime permanent connu en formules (voir env.py) ; premier ordre, constante de temps ~3 pas.
 kind: python
 env:
   entry: env.py:make_env

@@ -101,7 +101,7 @@ def test_loads_steady_and_dynamic_reports(tab):
                  out_dir=base / "20260102-100000", log=lambda m: None)
     t.set_project(project)
     assert t.result_combo.count() == 2
-    assert not t._steady() and t.table.rowCount() == 2 and "Fidelite" in t.table.horizontalHeaderItem(3).text()
+    assert not t._steady() and t.table.rowCount() == 2 and "Fidélité" in t.table.horizontalHeaderItem(3).text()
     assert t._candidate() is not None and t.equations.toPlainText()
     t.restyle()
     app.processEvents()

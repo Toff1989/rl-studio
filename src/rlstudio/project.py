@@ -8,6 +8,7 @@ from pathlib import Path
 import yaml
 
 from .paths import TEMPLATES_DIR, default_projects_dir
+from .textutil import ascii_safe
 
 DEFAULT_ALGO = {
     "name": "SAC",          # SAC | PPO | TD3
@@ -20,7 +21,7 @@ DEFAULT_ALGO = {
 
 
 def slugify(name: str) -> str:
-    s = re.sub(r"[^a-z0-9]+", "-", name.lower().strip()).strip("-")
+    s = re.sub(r"[^a-z0-9]+", "-", ascii_safe(name).lower().strip()).strip("-")
     return s or "projet"
 
 

@@ -33,7 +33,7 @@ class Expert:
         err = float(np.max(np.abs(sur.predict(probe) - self.act_batch(probe))))
         tol = atol * max(1.0, float(np.max(self.high - self.low)))
         if err > tol:
-            raise ValueError(f"l'extraction du reseau ne reproduit pas model.predict (ecart max {err:.3g})")
+            raise ValueError(f"l'extraction du réseau ne reproduit pas model.predict (écart max {err:.3g})")
         return sur
 
 
@@ -49,7 +49,7 @@ def extract_neural(model, algo, obs_names, act_names, low, high) -> NeuralSurrog
     elif algo == "PPO":
         modules = list(pol.mlp_extractor.policy_net) + [pol.action_net]
     else:
-        raise ValueError(f"algorithme non gere pour l'extraction exacte : {algo}")
+        raise ValueError(f"algorithme non géré pour l'extraction exacte : {algo}")
 
     layers = []
     for i, mod in enumerate(modules):
@@ -64,7 +64,7 @@ def extract_neural(model, algo, obs_names, act_names, low, high) -> NeuralSurrog
         elif isinstance(mod, (nn.Flatten, nn.Identity, nn.Dropout)):
             continue
         else:
-            raise ValueError(f"couche non geree pour l'extraction exacte : {type(mod).__name__}")
+            raise ValueError(f"couche non gérée pour l'extraction exacte : {type(mod).__name__}")
     return NeuralSurrogate(obs_names, act_names, low, high, layers, squash)
 
 
@@ -84,12 +84,12 @@ def load_expert(project, run_dir, env) -> Expert:
     run_dir = Path(run_dir)
     zip_path = run_dir / "model.zip"
     if not zip_path.exists():
-        raise FileNotFoundError(f"Pas de modele dans ce run : {zip_path}")
+        raise FileNotFoundError(f"Pas de modèle dans ce run : {zip_path}")
     algo = run_algo(run_dir, project.cfg["algo"]["name"])
     cls = {"SAC": SAC, "PPO": PPO, "TD3": TD3}[algo]
     space = env.action_space
     if not hasattr(space, "low"):
-        raise ValueError("L'extraction ne gere que les actions continues (Box).")
+        raise ValueError("L'extraction ne gère que les actions continues (Box).")
     obs_names = list(getattr(env, "obs_names", None) or [f"obs{i}" for i in range(int(np.prod(env.observation_space.shape)))])
     act_names = list(getattr(env, "action_names", None) or [f"action{i}" for i in range(int(np.prod(space.shape)))])
     model = cls.load(str(zip_path), device="cpu")

@@ -229,10 +229,10 @@ def summary(hw: dict) -> str:
     cpu = hw.get("cpu") or {}
     lines.append(f"Processeur : {cpu.get('name', 'inconnu')} ({cpu.get('threads', '?')} threads)")
     if hw.get("ram_gb"):
-        lines.append(f"Memoire : {hw['ram_gb']} Go")
+        lines.append(f"Mémoire : {hw['ram_gb']} Go")
     gpus = hw.get("gpus") or []
     if not gpus:
-        lines.append("Carte graphique : aucune detectee")
+        lines.append("Carte graphique : aucune détectée")
     for g in gpus:
         extra = []
         if g.get("memory_gb"):
@@ -244,7 +244,7 @@ def summary(hw: dict) -> str:
         lines.append(f"CUDA maximal du pilote : {hw.get('cuda_driver') or 'inconnu'}")
     ml = hw.get("matlab") or []
     if not ml:
-        lines.append("MATLAB : non detecte")
+        lines.append("MATLAB : non détecté")
     for m in ml:
         state = "" if m.get("complete") else " - installation INCOMPLETE"
         lines.append(f"MATLAB {m.get('release') or '?'} : {m['root']} "

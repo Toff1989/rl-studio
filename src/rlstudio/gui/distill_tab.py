@@ -18,7 +18,7 @@ from .runner import DistillRunner, RuntimeMissing, WorkerJob
 from .theme import C
 from .widgets import Card, button, fmt_run_date, label
 
-COLUMNS = ["Modele", "Complexite", "R2 (etats de l'expert)", "Retour", "Score", "Menes a terme", ""]
+COLUMNS = ["Modèle", "Complexité", "R2 (états de l'expert)", "Retour", "Score", "Menés à terme", ""]
 
 
 class DistillTab(QWidget):
@@ -53,20 +53,20 @@ class DistillTab(QWidget):
         self.f_eval = QSpinBox(); self.f_eval.setRange(1, 200); self.f_eval.setValue(10)
         self.f_margin = QDoubleSpinBox(); self.f_margin.setRange(0, 50); self.f_margin.setValue(5); self.f_margin.setSuffix(" %")
         self.f_dims = QSpinBox(); self.f_dims.setRange(1, 2); self.f_dims.setValue(2)
-        self.f_integ = QLineEdit(); self.f_integ.setPlaceholderText("ex : angle, position (action integrale d'un PID)")
+        self.f_integ = QLineEdit(); self.f_integ.setPlaceholderText("ex : angle, position (action intégrale d'un PID)")
         grid = QGridLayout()
         grid.setHorizontalSpacing(14)
-        fields = [("Episodes de collecte", self.f_episodes), ("Bruit d'action", self.f_noise), ("Tours de DAgger", self.f_dagger),
-                  ("Episodes / tour", self.f_dagger_eps), ("Episodes d'evaluation", self.f_eval), ("Tolerance", self.f_margin),
+        fields = [("Épisodes de collecte", self.f_episodes), ("Bruit d'action", self.f_noise), ("Tours de DAgger", self.f_dagger),
+                  ("Épisodes / tour", self.f_dagger_eps), ("Épisodes d'évaluation", self.f_eval), ("Tolérance", self.f_margin),
                   ("Dimensions de la table", self.f_dims)]
         for i, (txt, w) in enumerate(fields):
             grid.addWidget(label(txt, "sectionLabel"), (i // 4) * 2, i % 4)
             grid.addWidget(w, (i // 4) * 2 + 1, i % 4)
-        grid.addWidget(label("Observations integrees (PID)", "sectionLabel"), 2, 3)
+        grid.addWidget(label("Observations intégrées (PID)", "sectionLabel"), 2, 3)
         grid.addWidget(self.f_integ, 3, 3)
 
-        self.btn_start = button("Extraire le modele", "primary", self._start)
-        self.btn_stop = button("Arreter", None, self._stop)
+        self.btn_start = button("Extraire le modèle", "primary", self._start)
+        self.btn_stop = button("Arrêter", None, self._stop)
         self.btn_stop.setEnabled(False)
         self.progress = QProgressBar()
         self.progress.setRange(0, 1000)
@@ -91,13 +91,13 @@ class DistillTab(QWidget):
         row.addWidget(self.btn_stop)
         row.addWidget(self.progress, 1)
 
-        cfg = Card("Extraction", "Rejoue la politique apprise, ajuste des modeles simples sur ses decisions (avec DAgger pour "
-                   "eviter la derive), puis les compare en boucle fermee. Le modele le plus simple qui reste dans la tolerance est recommande.")
+        cfg = Card("Extraction", "Rejoue la politique apprise, ajuste des modèles simples sur ses décisions (avec DAgger pour "
+                   "éviter la dérive), puis les compare en boucle fermée. Le modèle le plus simple qui reste dans la tolérance est recommandé.")
         top = QHBoxLayout()
         top.addWidget(label("Run", "sectionLabel"))
         top.addWidget(self.run_combo, 1)
         cfg.body.addLayout(top)
-        cfg.body.addWidget(label("Familles de modeles", "sectionLabel"))
+        cfg.body.addWidget(label("Familles de modèles", "sectionLabel"))
         cfg.body.addLayout(meth)
         cfg.body.addLayout(grid)
         cfg.body.addLayout(row)
@@ -118,8 +118,8 @@ class DistillTab(QWidget):
         self.table.itemSelectionChanged.connect(self._show_candidate)
         self.table.setMinimumHeight(180)
 
-        self.pareto = self._plot("Simplicite / performance", "Complexite (parametres, echelle log)", "Score (0 = aleatoire, 1 = politique)")
-        self.scatter = self._plot("Fidelite des actions", "Action de la politique", "Action du modele")
+        self.pareto = self._plot("Simplicité / performance", "Complexité (paramètres, échelle log)", "Score (0 = aléatoire, 1 = politique)")
+        self.scatter = self._plot("Fidélité des actions", "Action de la politique", "Action du modèle")
         plots = QHBoxLayout()
         plots.addWidget(self.pareto)
         plots.addWidget(self.scatter)
@@ -139,12 +139,12 @@ class DistillTab(QWidget):
             actions.addWidget(b)
         actions.addStretch()
 
-        res = Card("Resultats")
+        res = Card("Résultats")
         self.summary = label("Aucune extraction pour ce run.", "muted", wrap=True)
         res.body.addWidget(self.summary)
         res.body.addWidget(self.table)
         res.body.addLayout(plots)
-        res.body.addWidget(label("Equations / description du modele selectionne", "sectionLabel"))
+        res.body.addWidget(label("Équations / description du modèle sélectionné", "sectionLabel"))
         res.body.addWidget(self.equations)
         res.body.addLayout(actions)
         res.body.addWidget(self.notes)
@@ -195,7 +195,7 @@ class DistillTab(QWidget):
         self.run_combo.blockSignals(False)
         self.btn_start.setEnabled(bool(runs) and self.runner is None)
         if not runs:
-            self._clear_results("Aucun run avec modele : entraine le projet d'abord.")
+            self._clear_results("Aucun run avec modèle : entraîne le projet d'abord.")
         else:
             self.run_combo.setCurrentIndex(0)
             self._load_report()
@@ -217,7 +217,7 @@ class DistillTab(QWidget):
         d = self._run_dir()
         rep = load_report(d) if d else None
         if rep is None:
-            self._clear_results("Aucune extraction pour ce run." if d else "Aucun run avec modele.")
+            self._clear_results("Aucune extraction pour ce run." if d else "Aucun run avec modèle.")
             return
         self.report = rep
         self._fill_results()
@@ -228,7 +228,7 @@ class DistillTab(QWidget):
         ex = rep["expert"]
         self.summary.setText(
             f"Politique apprise ({rep['algo']}) : retour moyen <b>{ex['return_mean']:.2f}</b> ± {ex['return_std']:.2f}, "
-            f"politique aleatoire : {rep['random_return']:.2f}. Extraction du {rep['created']} ({rep['duration_s']:.0f} s).")
+            f"politique aléatoire : {rep['random_return']:.2f}. Extraction du {rep['created']} ({rep['duration_s']:.0f} s).")
         self.summary.setTextFormat(Qt.RichText)
         cands = sorted(rep["candidates"], key=lambda c: c["complexity"])
         self.table.setRowCount(len(cands))
@@ -306,7 +306,7 @@ class DistillTab(QWidget):
         if not d or not self.project:
             return
         if not opts["methods"]:
-            QMessageBox.information(self, "Modele mathematique", "Coche au moins une famille de modeles.")
+            QMessageBox.information(self, "Modèle mathématique", "Coche au moins une famille de modèles.")
             return
         try:
             self.runner = DistillRunner(self.project, self.settings, d.name, opts, self)
@@ -325,7 +325,7 @@ class DistillTab(QWidget):
         self.status.setText("")
         self.logbox.clear()
         self.logbox.show()
-        self.stage.setText("Demarrage du processus de calcul (chargement de PyTorch, quelques secondes) ...")
+        self.stage.setText("Démarrage du processus de calcul (chargement de PyTorch, quelques secondes) ...")
         self._t0, self._fraction = time.monotonic(), 0.0
         self._tick()
         self.clock.start()
@@ -334,7 +334,7 @@ class DistillTab(QWidget):
     def _stop(self):
         if self.runner:
             self.runner.stop()
-            self.stage.setText("Arret...")
+            self.stage.setText("Arrêt...")
 
     def _on_log(self, text):
         self.logbox.appendPlainText(text.rstrip())
@@ -353,7 +353,7 @@ class DistillTab(QWidget):
         if self._t0 is None:
             return
         elapsed = time.monotonic() - self._t0
-        text = f"Ecoule : {self._fmt(elapsed)}"
+        text = f"Écoulé : {self._fmt(elapsed)}"
         if self._fraction > 0.03:
             text += f"   ·   reste environ {self._fmt(elapsed * (1 - self._fraction) / self._fraction)}"
         self.timing.setText(text)
@@ -368,13 +368,13 @@ class DistillTab(QWidget):
         self.btn_start.setEnabled(self.run_combo.count() > 0)
         self.busy.emit(False)
         self.stage.setText("")
-        self.timing.setText(f"Duree : {self._fmt(elapsed)}")
+        self.timing.setText(f"Durée : {self._fmt(elapsed)}")
         if message.startswith("ERREUR"):
             self.logbox.appendPlainText(message)
-            self.status.setText("Echec de l'extraction : voir le journal ci-dessus.")
+            self.status.setText("Échec de l'extraction : voir le journal ci-dessus.")
         else:
-            self.status.setText("Extraction terminee." if message.startswith("Termine") else "Extraction arretee.")
-            self.progress.setValue(1000 if message.startswith("Termine") else self.progress.value())
+            self.status.setText("Extraction terminée." if message.startswith("Terminé") else "Extraction arrêtée.")
+            self.progress.setValue(1000 if message.startswith("Terminé") else self.progress.value())
             self._load_report()
 
     # -- exports ---------------------------------------------------------------------------
@@ -393,8 +393,8 @@ class DistillTab(QWidget):
         c = self._candidate()
         if not c:
             return
-        target, _ = QFileDialog.getSaveFileName(self, "Enregistrer le modele", f"{c['id']}.py",
-                                                "Python (*.py);;MATLAB (*.m);;Equations (*.txt);;JSON (*.json)")
+        target, _ = QFileDialog.getSaveFileName(self, "Enregistrer le modèle", f"{c['id']}.py",
+                                                "Python (*.py);;MATLAB (*.m);;Équations (*.txt);;JSON (*.json)")
         if not target:
             return
         src = {".py": "policy.py", ".m": "policy.m", ".txt": "equations.txt", ".json": "surrogate.json"}.get(Path(target).suffix.lower())
@@ -406,23 +406,23 @@ class DistillTab(QWidget):
         if src == "policy.m":  # MATLAB exige que le nom de fonction == nom de fichier
             text = text.replace("policy", Path(target).stem)
         Path(target).write_text(text, encoding="utf-8")
-        self.status.setText(f"Enregistre : {target}")
+        self.status.setText(f"Enregistré : {target}")
 
     def _export_simulink(self):
         c = self._candidate()
         d = self._run_dir()
         if not c or not d or not self.project:
             return
-        target, _ = QFileDialog.getSaveFileName(self, "Controleur Simulink", f"controleur_{c['id'].replace('-', '_')}.slx",
-                                                "Modele Simulink (*.slx)")
+        target, _ = QFileDialog.getSaveFileName(self, "Contrôleur Simulink", f"controleur_{c['id'].replace('-', '_')}.slx",
+                                                "Modèle Simulink (*.slx)")
         if not target:
             return
         args = ["export-simulink", "--project", str(self.project.path), "--run", d.name, "--candidate", c["id"], "--out", target]
         self.job = WorkerJob(self.settings, args, self)
-        self.job.done.connect(lambda res, err: self.status.setText(f"Modele Simulink cree : {res['path']}" if res else f"ERREUR : {err}"))
+        self.job.done.connect(lambda res, err: self.status.setText(f"Modèle Simulink créé : {res['path']}" if res else f"ERREUR : {err}"))
         self.btn_slx.setEnabled(False)
         self.job.done.connect(lambda *_: self.btn_slx.setEnabled(True))
-        self.status.setText("Generation du modele Simulink (demarrage de MATLAB) ...")
+        self.status.setText("Génération du modèle Simulink (démarrage de MATLAB) ...")
         self.job.start()
 
     def _open_dir(self):

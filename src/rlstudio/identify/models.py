@@ -84,10 +84,10 @@ class DynModel:
 
     def _header(self):
         if self.static:
-            return (f"{self.title()} - identifie par RL Studio. Regime permanent y = f(u). Entrees : {', '.join(self.act_names)} ; "
+            return (f"{self.title()} - identifié par RL Studio. Régime permanent y = f(u). Entrées : {', '.join(self.act_names)} ; "
                     f"sorties : {', '.join(self.obs_names)}.")
-        return (f"{self.title()} - identifie par RL Studio. x(k+1) = x(k) + f(x(k), u(k)), pas {num(self.dt)} s. "
-                f"Etats : {', '.join(self.obs_names)} ; entrees : {', '.join(self.act_names)}.")
+        return (f"{self.title()} - identifié par RL Studio. x(k+1) = x(k) + f(x(k), u(k)), pas {num(self.dt)} s. "
+                f"États : {', '.join(self.obs_names)} ; entrées : {', '.join(self.act_names)}.")
 
     def to_python(self, name="dynamics") -> str:
         names = clean_names(self.in_names, RESERVED_PY)
@@ -211,11 +211,11 @@ class TermModel(DynModel):
         syms = self._syms(names, "m")
         out = []
         if self.normalize:
-            out.append("variables reduites : " + " ; ".join(f"z_{n} = ({n} - {self.mu[i]:.4g}) / {self.sd[i]:.4g}" for i, n in enumerate(names)))
+            out.append("variables réduites : " + " ; ".join(f"z_{n} = ({n} - {self.mu[i]:.4g}) / {self.sd[i]:.4g}" for i, n in enumerate(names)))
         if self.static:
             return out + [f"{n} = {self._expr(k, syms, 'm', 5)}" for k, n in enumerate(self.obs_names)]
         out += [f"{n}(k+1) = {n}(k) + [{self._expr(k, syms, 'm', 5)}]" for k, n in enumerate(self.obs_names)]
-        out.append(f"(pas de temps : {self.dt:g} s ; delta/dt ~ derivee de l'etat)")
+        out.append(f"(pas de temps : {self.dt:g} s ; delta/dt ~ dérivée de l'état)")
         return out
 
     def code(self, lang, xs, us):
@@ -308,18 +308,18 @@ def _fit_terms(data, terms, normalize, ridge, threshold=0.0, label=""):
 
 def fit_linear(data, ridge=1e-9) -> TermModel:
     n = data.n_in
-    return _fit_terms(data, _linear_library(n), False, ridge, label="Lineaire (A.x + B.u + c)")
+    return _fit_terms(data, _linear_library(n), False, ridge, label="Linéaire (A.x + B.u + c)")
 
 
 def fit_polynomial(data, degree=3, ridge=1e-8) -> TermModel:
     n = data.n_in
-    return _fit_terms(data, _poly_library(n, degree), True, ridge, label=f"Polynome degre {degree}")
+    return _fit_terms(data, _poly_library(n, degree), True, ridge, label=f"Polynôme degré {degree}")
 
 
 def fit_sparse(data, threshold, ridge=1e-8) -> TermModel:
     """SINDy : bibliotheque (monomes jusqu'au degre 3, sin, cos, tanh, abs) + regression a seuillage sequentiel."""
     n = data.n_in
-    return _fit_terms(data, _sparse_library(n), False, ridge, threshold=threshold, label=f"Equation parcimonieuse (seuil {threshold:g})")
+    return _fit_terms(data, _sparse_library(n), False, ridge, threshold=threshold, label=f"Équation parcimonieuse (seuil {threshold:g})")
 
 
 # ================================================================================================
@@ -330,7 +330,7 @@ class NeuralDynModel(DynModel):
 
     def __init__(self, obs_names, act_names, dt, mu, sd, dsd, layers, label="", static=False):
         """layers : [(W (out,in), b (out,))] ; tanh partout sauf la derniere (lineaire). delta = dsd * sortie."""
-        super().__init__(obs_names, act_names, dt, mu, sd, label or "Reseau de neurones", static)
+        super().__init__(obs_names, act_names, dt, mu, sd, label or "Réseau de neurones", static)
         self.dsd = np.maximum(np.asarray(dsd, float).ravel(), 1e-12)
         self.layers = [(np.asarray(W, float), np.asarray(b, float)) for W, b in layers]
 
@@ -351,9 +351,9 @@ class NeuralDynModel(DynModel):
         return f"{self.label} {'-'.join(map(str, sizes))}"
 
     def equations(self):
-        return [f"reseau {self.title().split()[-1]} ({self.complexity} parametres), activations tanh puis sortie lineaire",
+        return [f"reseau {self.title().split()[-1]} ({self.complexity} paramètres), activations tanh puis sortie linéaire",
                 ("y = " if self.static else "x(k+1) = x(k) + ") + "DSD .* ( Wn.tanh(...tanh(W1.((z - MU)/SD) + b1)...) + bn )",
-                "(formule explicite dans les fichiers exportes ; modele opaque, a utiliser comme modele reduit numerique)"]
+                "(formule explicite dans les fichiers exportés ; modèle opaque, à utiliser comme modèle réduit numérique)"]
 
     def code(self, lang, xs, us):
         py = lang == "py"
@@ -416,7 +416,7 @@ def fit_neural(data, hidden=(32, 32), epochs=300, lr=3e-3, batch=256, noise=0.02
                 v[j] = 0.999 * v[j] + 0.001 * gr ** 2
                 p -= rate * (m[j] / (1 - 0.9 ** step)) / (np.sqrt(v[j] / (1 - 0.999 ** step)) + 1e-8)
     return NeuralDynModel(data.obs_names, data.act_names, data.dt, mu, sd, dsd, [(P[2 * k], P[2 * k + 1]) for k in range(n_layers)],
-                          label=f"Reseau de neurones ({'x'.join(map(str, hidden))})", static=bool(getattr(data, "static", False)))
+                          label=f"Réseau de neurones ({'x'.join(map(str, hidden))})", static=bool(getattr(data, "static", False)))
 
 
 def model_from_dict(d: dict) -> DynModel:
@@ -431,7 +431,7 @@ def _model_from_dict(d: dict) -> DynModel:
         return TermModel(*common, [_from_json(t) for t in d["terms"]], d["C"], d["normalize"], label=d.get("label", ""), static=d.get("static", False))
     if d["kind"] == "neural":
         return NeuralDynModel(*common, d["dsd"], [(W, b) for W, b in d["layers"]], label=d.get("label", ""), static=d.get("static", False))
-    raise ValueError(f"type de modele inconnu : {d['kind']!r}")
+    raise ValueError(f"type de modèle inconnu : {d['kind']!r}")
 
 
 __all__ = ["DynModel", "TermModel", "NeuralDynModel", "fit_linear", "fit_polynomial", "fit_sparse", "fit_neural", "model_from_dict", "r_squared"]

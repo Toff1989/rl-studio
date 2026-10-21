@@ -72,7 +72,7 @@ class MainWindow(ProjectActions, ProjectTab, EnvTab, AlgoTab, TrainTab, RunsTab,
 
     def _open_settings(self, page=0):
         if self.worker:
-            QMessageBox.information(self, "Parametres", "Arrete l'entrainement en cours avant de modifier les parametres.")
+            QMessageBox.information(self, "Paramètres", "Arrête l'entraînement en cours avant de modifier les paramètres.")
             return
         page = page if isinstance(page, int) and not isinstance(page, bool) else 0
         dlg = SettingsDialog(self, self.settings, self._apply_theme, self._all_themes, self.theme_name)
@@ -121,7 +121,7 @@ class MainWindow(ProjectActions, ProjectTab, EnvTab, AlgoTab, TrainTab, RunsTab,
         sl.addLayout(improw)
         convrow = QHBoxLayout()
         convrow.setContentsMargins(16, 0, 16, 0)
-        convrow.addWidget(button("Convertir un modele Simulink...", "ghost", self._convert_dialog))
+        convrow.addWidget(button("Convertir un modèle Simulink...", "ghost", self._convert_dialog))
         sl.addLayout(convrow)
         lab = label("PROJETS", "sectionLabel")
         lab.setContentsMargins(20, 8, 0, 0)
@@ -147,7 +147,7 @@ class MainWindow(ProjectActions, ProjectTab, EnvTab, AlgoTab, TrainTab, RunsTab,
         arow.setContentsMargins(12, 0, 12, 0)
         arow.addWidget(self.btn_actions)
         sl.addLayout(arow)
-        self.btn_settings = button("⚙  Parametres", "ghost", self._open_settings)
+        self.btn_settings = button("⚙  Paramètres", "ghost", self._open_settings)
         srow = QHBoxLayout()
         srow.setContentsMargins(12, 0, 12, 0)
         srow.addWidget(self.btn_settings)
@@ -166,7 +166,7 @@ class MainWindow(ProjectActions, ProjectTab, EnvTab, AlgoTab, TrainTab, RunsTab,
         tl.setSpacing(12)
         self.top_title = label("", "h1")
         self.top_badge = label("", "badge")
-        self.lbl_dirty = label("●  Modifications non enregistrees", "dirty")
+        self.lbl_dirty = label("●  Modifications non enregistrées", "dirty")
         self.lbl_dirty.hide()
         self.btn_save = button("Enregistrer", "primary", self._save)
         tl.addWidget(self.top_title)
@@ -181,16 +181,16 @@ class MainWindow(ProjectActions, ProjectTab, EnvTab, AlgoTab, TrainTab, RunsTab,
         self.tabs.addTab(self._tab_general(), "Projet")
         self.tabs.addTab(self._tab_env(), "Environnement")
         self.tabs.addTab(self._tab_algo(), "Algorithme")
-        self.tabs.addTab(self._tab_train(), "Entrainement")
-        self.tabs.addTab(self._tab_runs(), "Resultats")
+        self.tabs.addTab(self._tab_train(), "Entraînement")
+        self.tabs.addTab(self._tab_runs(), "Résultats")
         self.distill = DistillTab(self.settings)
         self.distill.busy.connect(lambda b: self.plist.setEnabled(not b))
         self.identify = IdentifyTab(self.settings)
         self.identify.busy.connect(lambda b: self.plist.setEnabled(not b))
         self.evaltab = EvalTab(self.settings)
         self.evaltab.busy.connect(lambda b: self.plist.setEnabled(not b))
-        self.tabs.insertTab(4, self.evaltab, "Evaluation")
-        self.tabs.addTab(self.distill, "Modele mathematique")
+        self.tabs.insertTab(4, self.evaltab, "Évaluation")
+        self.tabs.addTab(self.distill, "Modèle mathématique")
         self.tabs.addTab(self.identify, "Identification")
         ml.addWidget(self.tabs, 1)
 

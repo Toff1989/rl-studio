@@ -1,5 +1,5 @@
 template_name: Simulink (mapping YAML)
-template_description: Pilote un modele Simulink existant ; on choisit les blocs/signaux observes, les parametres commandes et la recompense, sans ecrire de code.
+template_description: Pilote un modèle Simulink existant ; on choisit les blocs/signaux observés, les paramètres commandés et la récompense, sans écrire de code.
 name: Nouveau projet Simulink
 description: ""
 kind: simulink

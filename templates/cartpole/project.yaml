@@ -1,5 +1,5 @@
 template_name: Pendule inverse (CartPole)
-template_description: "Exemple classique de controle : equilibrer un pendule sur un chariot avec une force continue. Environnement Python autonome (sans simulateur externe)."
+template_description: "Exemple classique de contrôle : équilibrer un pendule sur un chariot avec une force continue. Environnement Python autonome (sans simulateur externe)."
 name: Pendule inverse
 description: Maintenir le pendule vertical le plus longtemps possible en poussant le chariot.
 kind: python

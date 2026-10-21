@@ -14,8 +14,8 @@ from .policy import load_expert
 from .surrogates import (NeuralSurrogate, Surrogate, fit_linear, fit_polynomial, fit_symbolic, fit_table, fit_tree, r_squared)
 
 METHODS = ("linear", "polynomial", "table", "tree", "symbolic", "neural")
-METHOD_LABELS = {"linear": "Lineaire / PID", "polynomial": "Polynome", "table": "Table de gains", "tree": "Arbre de decision",
-                 "symbolic": "Equation symbolique", "neural": "Reseau exact"}
+METHOD_LABELS = {"linear": "Linéaire / PID", "polynomial": "Polynôme", "table": "Table de gains", "tree": "Arbre de décision",
+                 "symbolic": "Équation symbolique", "neural": "Réseau exact"}
 
 
 @dataclass
@@ -31,7 +31,7 @@ class DistillOptions:
     poly_degrees: tuple = (2, 3)
     symbolic_terms: tuple = (3, 6, 12)
     table_dims: int = 2
-    integrators: tuple = ()       # observations a integrer (action integrale d'un PID)
+    integrators: tuple = ()       # observations à intégrer (action integrale d'un PID)
     integral_dt: float | None = None
     seed: int = 0
     max_steps: int | None = None
@@ -61,7 +61,7 @@ def run_distillation(project, run_dir, options: DistillOptions | None = None, lo
     opts = options or DistillOptions()
     unknown = [m for m in opts.methods if m not in METHODS]
     if unknown:
-        raise ValueError(f"methodes inconnues : {unknown} (disponibles : {METHODS})")
+        raise ValueError(f"méthodes inconnues : {unknown} (disponibles : {METHODS})")
     run_dir = Path(run_dir)
     progress = progress or _noop
     own_env = env is None
@@ -77,7 +77,7 @@ def _run(project, run_dir, opts, env, log, progress, should_stop):
     rng = np.random.default_rng(opts.seed)
     expert = load_expert(project, run_dir, env)
     n_obs, n_act = len(expert.obs_names), len(expert.act_names)
-    log(f"Politique chargee : {expert.algo}, {n_obs} observations, {n_act} action(s).")
+    log(f"Politique chargée : {expert.algo}, {n_obs} observations, {n_act} action(s).")
 
     families = [m for m in opts.methods]
     n_final = {"linear": 1, "polynomial": len(opts.poly_degrees), "table": 1, "tree": len(opts.tree_depths), "symbolic": len(opts.symbolic_terms), "neural": 1}
@@ -93,25 +93,25 @@ def _run(project, run_dir, opts, env, log, progress, should_stop):
         progress(stage, min(0.999, done[0] / total))
 
     def stage_cb(text):
-        return lambda k, n: bump(f"{text} : episode {k}/{n}")
+        return lambda k, n: bump(f"{text} : épisode {k}/{n}")
 
     eval_seed0 = 10_000 + opts.seed
     t0 = time.time()
     # -- references : politique aleatoire et politique apprise ----------------------------------
-    log("Evaluation de la politique aleatoire (reference basse) ...")
+    log("Évaluation de la politique aléatoire (référence basse) ...")
     random_res = collect.evaluate(env, lambda o: env.action_space.sample(), n_rand, 20_000 + opts.seed, should_stop=should_stop, max_steps=opts.max_steps,
-                                  on_episode=stage_cb("Reference aleatoire"))
-    log("Evaluation de la politique apprise ...")
+                                  on_episode=stage_cb("Référence aléatoire"))
+    log("Évaluation de la politique apprise ...")
     exp_res = collect.evaluate(env, expert.act, opts.eval_episodes, eval_seed0, expert=expert, should_stop=should_stop, max_steps=opts.max_steps,
-                           on_episode=stage_cb("Evaluation de la politique apprise"))
+                           on_episode=stage_cb("Évaluation de la politique apprise"))
     held_obs, held_labels = exp_res["obs_episodes"], exp_res["expert_labels"]
     rand_ret, exp_ret = random_res["return_mean"], exp_res["return_mean"]
-    log(f"  retour : aleatoire {rand_ret:.3f}  |  politique apprise {exp_ret:.3f} +/- {exp_res['return_std']:.3f}")
+    log(f"  retour : aléatoire {rand_ret:.3f}  |  politique apprise {exp_ret:.3f} +/- {exp_res['return_std']:.3f}")
 
-    log(f"Collecte de {opts.episodes} episodes de la politique apprise (bruit d'action {opts.noise:.0%}) ...")
+    log(f"Collecte de {opts.episodes} épisodes de la politique apprise (bruit d'action {opts.noise:.0%}) ...")
     base = collect.collect_expert(env, expert, opts.episodes, opts.noise, seed0=0 + opts.seed, rng=rng, should_stop=should_stop, max_steps=opts.max_steps,
-                                 on_episode=stage_cb("Collecte de donnees"))
-    log(f"  {len(base)} paires (etat -> action)")
+                                 on_episode=stage_cb("Collecte de données"))
+    log(f"  {len(base)} paires (état -> action)")
 
     dt = opts.integral_dt or float(getattr(env, "step_s", 1.0) or 1.0)
     mid = lambda seq: seq[len(seq) // 2]  # noqa: E731
@@ -139,7 +139,7 @@ def _run(project, run_dir, opts, env, log, progress, should_stop):
 
     def score(cand_id, family, sur: Surrogate):
         res = collect.evaluate(env, sur.act, opts.eval_episodes, eval_seed0, reset=sur.reset, expert=expert, should_stop=should_stop, max_steps=opts.max_steps,
-                           on_episode=stage_cb(f"Evaluation en boucle fermee de {cand_id}"))
+                           on_episode=stage_cb(f"Évaluation en boucle fermée de {cand_id}"))
         pred = sur.predict_episodes(held_obs)
         r2_exp = r_squared(held_labels, pred)
         pairs = np.column_stack([held_labels[:, 0], pred[:, 0]])
@@ -161,7 +161,7 @@ def _run(project, run_dir, opts, env, log, progress, should_stop):
             raise collect.Stopped()
         log(f"== {METHOD_LABELS[family]}")
         if family == "neural":
-            log("  extraction du reseau ...")
+            log("  extraction du réseau ...")
             score("neural", family, expert.neural())
             continue
         data = base
@@ -169,10 +169,10 @@ def _run(project, run_dir, opts, env, log, progress, should_stop):
             log(f"  DAgger : {opts.dagger_iters} tour(s) de {opts.dagger_episodes} episode(s)")
             data, _ = collect.run_dagger(env, expert, fit_for_dagger[family], base, opts.dagger_iters, opts.dagger_episodes,
                                          seed0=500 + opts.seed, rng=rng, should_stop=should_stop,
-                                         tick=lambda f=family: log(f"  tour de DAgger termine, modele {METHOD_LABELS[f]} reajuste"),
+                                         tick=lambda f=family: log(f"  tour de DAgger terminé, modèle {METHOD_LABELS[f]} réajusté"),
                                          max_steps=opts.max_steps,
-                                         on_episode=lambda it, k, n, f=family: bump(f"DAgger {METHOD_LABELS[f]} : tour {it}/{opts.dagger_iters}, episode {k}/{n}"))
-        log("  ajustement final des modeles ...")
+                                         on_episode=lambda it, k, n, f=family: bump(f"DAgger {METHOD_LABELS[f]} : tour {it}/{opts.dagger_iters}, épisode {k}/{n}"))
+        log("  ajustement final des modèles ...")
         for cand_id, sur in finals[family](data):
             score(cand_id, family, sur)
 
@@ -183,18 +183,18 @@ def _run(project, run_dir, opts, env, log, progress, should_stop):
     sat = float(np.mean((np.abs(held_labels - expert.low) < 0.01 * (expert.high - expert.low)) | (np.abs(held_labels - expert.high) < 0.01 * (expert.high - expert.low))))
     notes = []
     if exp_res["completed_rate"] < 1.0:
-        notes.append(f"La politique apprise interrompt elle-meme {100 * (1 - exp_res['completed_rate']):.0f} % de ses episodes : le score de reference est relatif a ce comportement.")
+        notes.append(f"La politique apprise interrompt elle-même {100 * (1 - exp_res['completed_rate']):.0f} % de ses épisodes : le score de référence est relatif à ce comportement.")
     if sat > 0.2:
-        notes.append(f"{sat:.0%} des actions de la politique apprise sont a la borne : un modele lisse peut mal reproduire ces paliers (preferer l'arbre).")
+        notes.append(f"{sat:.0%} des actions de la politique apprise sont à la borne : un modèle lisse peut mal reproduire ces paliers (préférer l'arbre).")
     if opts.dagger_iters == 0:
-        notes.append("DAgger desactive : les modeles sont ajustes sur les seuls etats de la politique apprise et peuvent deriver en boucle fermee.")
+        notes.append("DAgger désactivé : les modèles sont ajustés sur les seuls états de la politique apprise et peuvent dériver en boucle fermée.")
     if any(c["stateful"] for c in candidates):
-        notes.append("Un modele a etat (integrale) doit etre reinitialise (reset / clear) au debut de chaque episode.")
+        notes.append("Un modèle à état (intégrale) doit être réinitialisé (reset / clear) au début de chaque épisode.")
     if not ok:
-        notes.append(f"Aucun modele n'atteint {(1 - opts.margin):.0%} du score de la politique apprise : augmenter les episodes, les tours de DAgger ou la complexite.")
-    notes.append("Hors des etats visites pendant la collecte, les modeles simples extrapolent : valider en simulation avant tout usage.")
+        notes.append(f"Aucun modèle n'atteint {(1 - opts.margin):.0%} du score de la politique apprise : augmenter les épisodes, les tours de DAgger ou la complexité.")
+    notes.append("Hors des états visites pendant la collecte, les modèles simples extrapolent : valider en simulation avant tout usage.")
     if not ok or recommended != "neural":
-        notes.append("La fidelite aux actions (R2) ne garantit pas la performance : se fier au score en boucle fermee.")
+        notes.append("La fidélité aux actions (R2) ne garantit pas la performance : se fier au score en boucle fermée.")
 
     report = {"version": __version__, "created": time.strftime("%Y-%m-%d %H:%M"), "project": project.name, "run": run_dir.name,
               "algo": expert.algo, "obs_names": expert.obs_names, "act_names": expert.act_names, "options": asdict(opts),
@@ -203,5 +203,5 @@ def _run(project, run_dir, opts, env, log, progress, should_stop):
               "duration_s": round(time.time() - t0, 1)}
     path = export.write_report(report, run_dir)
     log(f"Rapport : {path}")
-    progress("Termine", 1.0)
+    progress("Terminé", 1.0)
     return report

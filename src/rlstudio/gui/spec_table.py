@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (
 
 
 # colonnes des tables Simulink : (cle, titre, type)
-ACTION_COLS = [("name", "Nom", str), ("block", "Bloc", str), ("param", "Parametre", str),
+ACTION_COLS = [("name", "Nom", str), ("block", "Bloc", str), ("param", "Paramètre", str),
                ("variable", "ou Variable", str), ("low", "Min", float), ("high", "Max", float)]
 OBS_COLS = [("name", "Nom", str), ("block", "Bloc (sortie)", str), ("port", "Port", int),
             ("size", "Taille", int), ("low", "Min", float), ("high", "Max", float)]

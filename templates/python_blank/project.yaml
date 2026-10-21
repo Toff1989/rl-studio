@@ -1,5 +1,5 @@
 template_name: Python vide
-template_description: Environnement Gymnasium ecrit en Python (modele simple a completer dans env.py).
+template_description: Environnement Gymnasium écrit en Python (modèle simple à compléter dans env.py).
 name: Nouveau projet
 description: ""
 kind: python

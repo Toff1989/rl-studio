@@ -60,7 +60,7 @@ class ProjectActions:
         self._load_project(self.store.get(cur.data(Qt.UserRole)) if cur else None)
 
     def _ask_save(self):
-        r = QMessageBox.question(self, "Modifications non enregistrees", "Enregistrer les modifications ?",
+        r = QMessageBox.question(self, "Modifications non enregistrées", "Enregistrer les modifications ?",
                                  QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel)
         if r == QMessageBox.Cancel:
             return False
@@ -74,7 +74,7 @@ class ProjectActions:
             return
         templates = self.store.list_templates()
         labels = [f"{n} - {d}" for _, n, d in templates]
-        choice, ok = QInputDialog.getItem(self, "Nouveau projet", "Modele de depart :", labels, 0, False)
+        choice, ok = QInputDialog.getItem(self, "Nouveau projet", "Modèle de départ :", labels, 0, False)
         if not ok:
             return
         tid = templates[labels.index(choice)][0]
@@ -110,7 +110,7 @@ class ProjectActions:
             return
         r = QMessageBox.question(
             self, "Supprimer", f"Supprimer le projet « {self.project.name} » ?\n"
-            "Il sera deplace dans projects/.trash/ et pourra etre recupere.")
+            "Il sera déplacé dans projects/.trash/ et pourra être récupéré.")
         if r == QMessageBox.Yes:
             self.store.delete(self.project)
             self.project = None
@@ -123,7 +123,7 @@ class ProjectActions:
         if self.dirty and not self._ask_save():
             return
         if self.worker or any(getattr(t, "runner", None) for t in (self.distill, self.evaltab, self.identify)):
-            QMessageBox.information(self, "Convertir un modele", "Attends la fin du calcul en cours avant de convertir un modele.")
+            QMessageBox.information(self, "Convertir un modèle", "Attends la fin du calcul en cours avant de convertir un modèle.")
             return
         dlg = ConvertDialog(self, self.settings, self.store)
         dlg.exec()
@@ -137,16 +137,16 @@ class ProjectActions:
 
         if not self.project or (self.dirty and not self._save()):
             return
-        labels = ["Sans resultats d'entrainement (le plus leger)", "Avec le dernier entrainement et son modele",
-                  "Avec tous les entrainements"]
+        labels = ["Sans résultats d'entraînement (le plus léger)", "Avec le dernier entraînement et son modèle",
+                  "Avec tous les entraînements"]
         choice, ok = QInputDialog.getItem(self, "Exporter le projet", "Contenu de l'archive :", labels, 0, False)
         if not ok:
             return
         mode = ("none", "last", "all")[labels.index(choice)]
         ident = "last"
         if (self.project.path / "identify").is_dir() and any((self.project.path / "identify").glob("*/report.json")):
-            id_labels = ["Avec la derniere identification (reglages inclus)", "Avec toutes les identifications", "Sans resultats d'identification"]
-            id_choice, ok = QInputDialog.getItem(self, "Exporter le projet", "Identification de modele reduit :", id_labels, 0, False)
+            id_labels = ["Avec la dernière identification (réglages inclus)", "Avec toutes les identifications", "Sans résultats d'identification"]
+            id_choice, ok = QInputDialog.getItem(self, "Exporter le projet", "Identification de modèle réduit :", id_labels, 0, False)
             if not ok:
                 return
             ident = ("last", "all", "none")[id_labels.index(id_choice)]
@@ -159,7 +159,7 @@ class ProjectActions:
         except Exception as e:
             QMessageBox.critical(self, "Export impossible", str(e))
             return
-        QMessageBox.information(self, "Projet exporte", f"{out}\n\nTaille : {out.stat().st_size / 1024:.0f} Ko")
+        QMessageBox.information(self, "Projet exporté", f"{out}\n\nTaille : {out.stat().st_size / 1024:.0f} Ko")
 
     def _import_dialog(self):
         path, _ = QFileDialog.getOpenFileName(self, "Importer un projet", str(Path.home()), "Projet RL Studio (*.rls)")
@@ -170,13 +170,13 @@ class ProjectActions:
         m = report["manifest"]
         lines = [f"<b>{m['name']}</b> ({m['kind']}) - {report['files']} fichiers, {report['size'] / 1024:.0f} Ko"]
         if report["runs"]:
-            lines.append(f"Resultats d'entrainement inclus : {len(report['runs'])}")
+            lines.append(f"Résultats d'entraînement inclus : {len(report['runs'])}")
         if report.get("identifications"):
-            lines.append(f"Resultats d'identification inclus : {len(report['identifications'])}")
+            lines.append(f"Résultats d'identification inclus : {len(report['identifications'])}")
         if report["code_files"]:
             shown = ", ".join(report["code_files"][:8]) + (" ..." if len(report["code_files"]) > 8 else "")
-            lines.append("<br><b>Attention :</b> ce projet contient du <b>code qui s'executera sur votre ordinateur</b> "
-                         f"(environnement Python, modele Simulink, scripts) :<br><i>{shown}</i><br><br>"
+            lines.append("<br><b>Attention :</b> ce projet contient du <b>code qui s'exécutera sur votre ordinateur</b> "
+                         f"(environnement Python, modèle Simulink, scripts) :<br><i>{shown}</i><br><br>"
                          "N'importez que des projets provenant de personnes de confiance.")
         box = QMessageBox(self)
         box.setWindowTitle("Importer un projet")
@@ -196,7 +196,7 @@ class ProjectActions:
         try:
             report = inspect_archive(path)
             if report["problems"]:
-                raise ArchiveError("Import refuse :\n- " + "\n- ".join(report["problems"]))
+                raise ArchiveError("Import refusé :\n- " + "\n- ".join(report["problems"]))
             if not (confirm or self._confirm_import)(report):
                 return None
             if self.dirty and not self._ask_save():
@@ -295,7 +295,7 @@ class ProjectActions:
                 c["env"]["entry"] = self.py_entry.text().strip()
                 c["env"]["params"] = yaml.safe_load(self.py_params.toPlainText()) or {}
                 if not isinstance(c["env"]["params"], dict):
-                    raise ValueError("Les parametres doivent etre un dictionnaire YAML.")
+                    raise ValueError("Les paramètres doivent être un dictionnaire YAML.")
             else:
                 c["env"].update({
                     "model": self.sl_model.text().strip(), "step_s": self.sl_step.value(),
@@ -305,7 +305,7 @@ class ProjectActions:
                 })
             kw = yaml.safe_load(self.a_kwargs.toPlainText()) or {}
             if not isinstance(kw, dict):
-                raise ValueError("Les hyperparametres doivent etre un dictionnaire YAML.")
+                raise ValueError("Les hyperparamètres doivent être un dictionnaire YAML.")
         except yaml.YAMLError as e:
             raise ValueError(f"YAML invalide : {e}")
         c["algo"].update(name=self.a_name.currentText(), total_timesteps=self.a_steps.value(),

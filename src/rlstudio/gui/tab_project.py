@@ -15,11 +15,11 @@ class ProjectTab:
         self.f_name = QLineEdit()
         self.f_name.setPlaceholderText("Nom du projet")
         self.f_desc = QPlainTextEdit()
-        self.f_desc.setPlaceholderText("Decris l'objectif : systeme controle, critere a optimiser...")
+        self.f_desc.setPlaceholderText("Décris l'objectif : système contrôlé, critère à optimiser...")
         self.f_desc.setFixedHeight(88)
 
-        self.k_kind, self.k_algo, self.k_steps = Kpi("Type"), Kpi("Algorithme"), Kpi("Duree")
-        self.k_runs, self.k_last = Kpi("Entrainements"), Kpi("Dernier entrainement")
+        self.k_kind, self.k_algo, self.k_steps = Kpi("Type"), Kpi("Algorithme"), Kpi("Durée")
+        self.k_runs, self.k_last = Kpi("Entraînements"), Kpi("Dernier entraînement")
         kpis = QHBoxLayout()
         kpis.setSpacing(12)
         for k in (self.k_kind, self.k_algo, self.k_steps, self.k_runs, self.k_last):
@@ -31,7 +31,7 @@ class ProjectTab:
         self.v_env.setTextInteractionFlags(Qt.TextSelectableByMouse)
         env.body.addWidget(self.v_env)
 
-        self.btn_go_train = button("▶  Aller a l'entrainement", "primary", lambda: self.tabs.setCurrentIndex(3))
+        self.btn_go_train = button("▶  Aller à l'entraînement", "primary", lambda: self.tabs.setCurrentIndex(3))
         row = QHBoxLayout()
         row.setSpacing(10)
         row.addWidget(self.btn_go_train)
@@ -71,14 +71,14 @@ class ProjectTab:
             created = f"{created[8:10]}/{created[5:7]}/{created[0:4]} {created[11:]}"
         if p.kind == "python":
             keys = ", ".join(map(str, (env.get("params") or {}).keys())) or "aucun"
-            self.v_env.setText(f"Point d'entree : <b>{env.get('entry', 'env.py:make_env')}</b><br>"
-                               f"Groupes de parametres : {keys}")
+            self.v_env.setText(f"Point d'entrée : <b>{env.get('entry', 'env.py:make_env')}</b><br>"
+                               f"Groupes de paramètres : {keys}")
         else:
             acts, obs = env.get("actions") or [], env.get("observations") or []
             self.v_env.setText(
-                f"Modele : <b>{env.get('model', '-')}</b><br>"
-                f"Pas de decision : {env.get('step_s', '-')} s &nbsp;·&nbsp; episode : {env.get('episode_s', '-')} s<br>"
+                f"Modèle : <b>{env.get('model', '-')}</b><br>"
+                f"Pas de décision : {env.get('step_s', '-')} s &nbsp;·&nbsp; épisode : {env.get('episode_s', '-')} s<br>"
                 f"{len(acts)} action(s) : {', '.join(x.get('name', '?') for x in acts) or '-'}<br>"
                 f"{len(obs)} observation(s) : {', '.join(x.get('name', '?') for x in obs) or '-'}<br>"
-                f"Recompense : <code>{env.get('reward', '-')}</code>")
-        self.v_path.setText(f"Cree le {created}   ·   {p.path}")
+                f"Récompense : <code>{env.get('reward', '-')}</code>")
+        self.v_path.setText(f"Créé le {created}   ·   {p.path}")

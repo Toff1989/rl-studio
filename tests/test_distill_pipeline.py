@@ -64,7 +64,7 @@ def test_full_pipeline_and_report(store):
     assert load_report(run_dir)["recommended"] == report["recommended"]
     sur = load_candidate(run_dir, "linear")
     assert sur.act(np.zeros(len(report["obs_names"]))).shape == (1,)
-    assert (distill_dir(run_dir) / "report.md").read_text(encoding="utf-8").startswith("# Modele")
+    assert (distill_dir(run_dir) / "report.md").read_text(encoding="utf-8").startswith("# Modèle")
 
 
 def test_unknown_method_rejected(store):

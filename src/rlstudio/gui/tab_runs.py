@@ -19,10 +19,10 @@ class RunsTab:
         self.runs_list = QListWidget()
         self.runs_list.setObjectName("runs")
         self.runs_list.currentItemChanged.connect(self._show_run)
-        self.runs_empty = label("Aucun entrainement pour ce projet.\nLance-en un depuis l'onglet Entrainement.",
+        self.runs_empty = label("Aucun entraînement pour ce projet.\nLance-en un depuis l'onglet Entraînement.",
                                 "muted", wrap=True)
         self.runs_empty.setAlignment(Qt.AlignCenter)
-        left = Card("Entrainements")
+        left = Card("Entraînements")
         left.body.addWidget(self.runs_list, 1)
         left.body.addWidget(self.runs_empty)
         left.setFixedWidth(330)
@@ -38,7 +38,7 @@ class RunsTab:
         detail = Card()
         detail.body.addWidget(self.run_title)
         detail.body.addWidget(self.run_info)
-        detail.body.addWidget(label("Configuration utilisee", "sectionLabel"))
+        detail.body.addWidget(label("Configuration utilisée", "sectionLabel"))
         detail.body.addWidget(self.run_cfg, 1)
         drow = QHBoxLayout()
         drow.addWidget(self.btn_run_dir)
@@ -67,7 +67,7 @@ class RunsTab:
                     sub.append(f"reference {json.loads(base.read_text(encoding='utf-8'))['mean']:.2f}")
                 except Exception:
                     pass
-            sub.append("modele ✓" if (d / "model.zip").exists() else "sans modele")
+            sub.append("modèle ✓" if (d / "model.zip").exists() else "sans modèle")
             it = QListWidgetItem(f"{fmt_run_date(d.name)}\n{'  ·  '.join(sub)}")
             it.setData(Qt.UserRole, str(d))
             self.runs_list.addItem(it)
@@ -84,11 +84,11 @@ class RunsTab:
         self.run_title.setText(fmt_run_date(os.path.basename(d)))
         rows = []
         has_model = os.path.exists(os.path.join(d, "model.zip"))
-        rows.append(f"Modele : <b>{'enregistre' if has_model else 'absent (entrainement interrompu ou en erreur)'}</b>")
+        rows.append(f"Modèle : <b>{'enregistre' if has_model else 'absent (entraînement interrompu ou en erreur)'}</b>")
         base = os.path.join(d, "baseline.json")
         if os.path.exists(base):
             b = json.loads(open(base, encoding="utf-8").read())
-            rows.append(f"Reference ({b.get('label', '?')}) : <b>{b['mean']:.3f}</b> ± {b['std']:.3f}")
+            rows.append(f"Référence ({b.get('label', '?')}) : <b>{b['mean']:.3f}</b> ± {b['std']:.3f}")
         rows.append(f"<span style='color:{C['muted']}'>{d}</span>")
         self.run_info.setText("<br>".join(rows))
         cfg = os.path.join(d, "project.yaml")

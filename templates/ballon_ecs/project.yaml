@@ -1,7 +1,7 @@
-template_name: Ballon d'ECS - tarif et photovoltaique
-template_description: "Ballon d'eau chaude sanitaire de 300 L chauffe par PAC : tarif heures pleines/creuses, production photovoltaique et soutirages aleatoires. Reference : contacteur heures creuses. Environnement Python autonome."
+template_name: Ballon d'ECS - tarif et photovoltaïque
+template_description: "Ballon d'eau chaude sanitaire de 300 L chauffé par PAC : tarif heures pleines/creuses, production photovoltaïque et soutirages aléatoires. Référence : contacteur heures creuses. Environnement Python autonome."
 name: Ballon ECS
-description: Garder l'eau chaude disponible au moindre cout en decalant la chauffe vers les heures creuses et le soleil.
+description: Garder l'eau chaude disponible au moindre coût en décalant la chauffe vers les heures creuses et le soleil.
 kind: python
 env:
   entry: env.py:make_env

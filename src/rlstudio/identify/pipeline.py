@@ -16,10 +16,11 @@ from .. import __version__
 from ..distill.collect import Stopped
 from ..distill.surrogates import r_squared
 from ..envs.loader import make_env
+from ..textutil import ascii_safe
 from . import collect, models
 
 METHODS = ("linear", "polynomial", "sparse", "neural")
-METHOD_LABELS = {"linear": "Lineaire", "polynomial": "Polynome", "sparse": "Equation parcimonieuse", "neural": "Reseau de neurones"}
+METHOD_LABELS = {"linear": "Linéaire", "polynomial": "Polynôme", "sparse": "Équation parcimonieuse", "neural": "Réseau de neurones"}
 HORIZONS = (1, 2, 5, 10, 20, 50, 100)
 
 
@@ -95,7 +96,7 @@ def run_identification(project, options: IdentifyOptions | None = None, log=prin
     opts = options or IdentifyOptions()
     unknown = [m for m in opts.methods if m not in METHODS]
     if unknown:
-        raise ValueError(f"methodes inconnues : {unknown} (disponibles : {METHODS})")
+        raise ValueError(f"méthodes inconnues : {unknown} (disponibles : {METHODS})")
     own = env is None
     env = env or make_env(project)
     try:
@@ -133,11 +134,11 @@ def identify_env(env, opts, name="env", out_dir=None, log=print, progress=None, 
         if n in opts.fixed:
             low[i] = high[i] = float(np.clip(float(opts.fixed[n]), env_low[i], env_high[i]))
     sweep_kw = dict(hold_max=opts.hold_max, extreme=opts.extreme, max_steps=opts.max_steps, should_stop=should_stop, action_fn=action_fn, bounds=(low, high))
-    log(f"Balayage : {opts.episodes} episode(s) d'apprentissage + {opts.val_episodes} de validation (actions variees, paliers de 1 a {opts.hold_max} pas) ...")
-    train = collect.sweep(env, opts.episodes, 100 + opts.seed, rng, on_episode=lambda k, n: bump(f"Balayage : episode {k}/{n}"), **sweep_kw)
-    val = collect.sweep(env, opts.val_episodes, 900_000 + opts.seed, rng, on_episode=lambda k, n: bump(f"Validation : episode {k}/{n}"), **sweep_kw)
+    log(f"Balayage : {opts.episodes} episode(s) d'apprentissage + {opts.val_episodes} de validation (actions variées, paliers de 1 a {opts.hold_max} pas) ...")
+    train = collect.sweep(env, opts.episodes, 100 + opts.seed, rng, on_episode=lambda k, n: bump(f"Balayage : épisode {k}/{n}"), **sweep_kw)
+    val = collect.sweep(env, opts.val_episodes, 900_000 + opts.seed, rng, on_episode=lambda k, n: bump(f"Validation : épisode {k}/{n}"), **sweep_kw)
     if not len(train) or not len(val):
-        raise ValueError("Aucune transition collectee (episodes vides) : verifier l'environnement.")
+        raise ValueError("Aucune transition collectée (épisodes vides) : vérifier l'environnement.")
     log(f"  {len(train)} transitions d'apprentissage, {len(val)} de validation ; pas de temps {train.dt:g} s")
     state_std = np.maximum(np.concatenate([val.states(), train.states()]).std(0), 1e-12)
 
@@ -145,11 +146,11 @@ def identify_env(env, opts, name="env", out_dir=None, log=print, progress=None, 
     curve = []
     for r in range(opts.rounds):
         fresh = collect.sweep(env, opts.round_episodes, 200_000 + 1000 * r + opts.seed, rng,
-                              on_episode=lambda k, n, r=r: bump(f"Tour {r + 1} : episode {k}/{n}"), **sweep_kw)
+                              on_episode=lambda k, n, r=r: bump(f"Tour {r + 1} : épisode {k}/{n}"), **sweep_kw)
         guide = models.fit_polynomial(train, degree=2)
         score = evaluate(guide, fresh, state_std, _bounds(train))["free_r2"]
         curve.append({"transitions": len(train), "free_r2_poly2": score})
-        log(f"  tour {r + 1} : {len(train)} transitions -> fidelite du polynome (deg. 2) sur donnees neuves : {score:.3f}")
+        log(f"  tour {r + 1} : {len(train)} transitions -> fidélité du polynôme (deg. 2) sur données neuves : {score:.3f}")
         train.extend(fresh)
     clip = _bounds(train)
 
@@ -178,7 +179,7 @@ def identify_env(env, opts, name="env", out_dir=None, log=print, progress=None, 
             entry["files"] = write_candidate(out_dir / cid, model)
         candidates.append(entry)
         bump(f"Ajustement : {cid}")
-        log(f"  complexite {entry['complexity']:6d}  R2 un pas {res['r2_one_step']:7.4f}  fidelite en simulation libre {res['free_r2']:7.4f}"
+        log(f"  complexite {entry['complexity']:6d}  R2 un pas {res['r2_one_step']:7.4f}  fidélité en simulation libre {res['free_r2']:7.4f}"
             f"{'  (divergence sur ' + str(res['diverged']) + ' episode(s))' if res['diverged'] else ''}")
 
     ok = [c for c in candidates if c["free_r2"] >= 1.0 - opts.margin]
@@ -192,7 +193,7 @@ def identify_env(env, opts, name="env", out_dir=None, log=print, progress=None, 
         report["dir"] = str(out_dir)
         write_report(report, out_dir)
         log(f"Rapport : {out_dir / 'report.json'}")
-    progress("Termine", 1.0)
+    progress("Terminé", 1.0)
     return report
 
 
@@ -200,17 +201,17 @@ def _notes(candidates, ok, opts, train):
     notes = []
     best = max(candidates, key=lambda c: c["free_r2"])
     if not ok:
-        notes.append(f"Aucun modele n'atteint {1 - opts.margin:.0%} de fidelite en simulation libre : augmenter les episodes ou les tours de collecte, "
-                     f"ou elargir la famille de modeles.")
+        notes.append(f"Aucun modèle n'atteint {1 - opts.margin:.0%} de fidélité en simulation libre : augmenter les épisodes ou les tours de collecte, "
+                     f"ou élargir la famille de modèles.")
     if best["r2_one_step"] > 0.99 and best["free_r2"] < 0.8:
-        notes.append("Bon a un pas mais mauvais en simulation libre : l'erreur s'accumule (modele instable) ou l'etat n'est pas completement observe "
-                     "(etat cache dans le modele : integrateur, retard, thermique lente). Ajouter les signaux manquants aux observations.")
+        notes.append("Bon à un pas mais mauvais en simulation libre : l'erreur s'accumule (modèle instable) ou l'état n'est pas complètement observé "
+                     "(état caché dans le modèle : intégrateur, retard, thermique lente). Ajouter les signaux manquants aux observations.")
     if any(c["diverged"] for c in candidates):
-        notes.append("Certains modeles divergent en simulation libre : leurs predictions sont ecretees ; ne pas les utiliser hors des plages balayees.")
-    notes.append("Le modele n'est valable que dans les plages d'etat et d'action balayees : les etats atteignables par le systeme reel hors de ces plages "
-                 "ne sont pas couverts (elargir les bornes d'action / conditions initiales de l'environnement).")
-    notes.append("Les non-linearites tres fortes (saturations, frottements secs, commutations) sont lissees par les modeles polynomiaux ; "
-                 "preferer le reseau, ou une bibliotheque de termes adaptee.")
+        notes.append("Certains modèles divergent en simulation libre : leurs predictions sont écrêtées ; ne pas les utiliser hors des plages balayées.")
+    notes.append("Le modèle n'est valable que dans les plages d'état et d'action balayées : les états atteignables par le système réel hors de ces plages "
+                 "ne sont pas couverts (élargir les bornes d'action / conditions initiales de l'environnement).")
+    notes.append("Les non-linéarités très fortes (saturations, frottements secs, commutations) sont lissées par les modèles polynomiaux ; "
+                 "préférer le réseau, ou une bibliothèque de termes adaptée.")
     return notes
 
 
@@ -218,7 +219,7 @@ def write_candidate(dirpath: Path, model) -> dict:
     dirpath.mkdir(parents=True, exist_ok=True)
     stem = "steady_state" if model.static else "dynamics"
     (dirpath / f"{stem}.py").write_text(model.to_python(stem), encoding="utf-8")
-    (dirpath / f"{stem}.m").write_text(model.to_matlab(stem), encoding="utf-8")
+    (dirpath / f"{stem}.m").write_text(ascii_safe(model.to_matlab(stem)), encoding="utf-8")
     (dirpath / "equations.txt").write_text(model.title() + "\n\n" + "\n".join(model.equations()) + "\n", encoding="utf-8")
     (dirpath / "model.json").write_text(json.dumps(model.to_dict()), encoding="utf-8")
     return {"python": f"{stem}.py", "matlab": f"{stem}.m", "equations": "equations.txt", "json": "model.json"}
@@ -241,17 +242,17 @@ def load_candidate(report_dir, cid):
 def report_markdown(r: dict) -> str:
     if r.get("mode") == "steady":
         return _steady_markdown(r)
-    lines = [f"# Modele reduit identifie - {r['project']}", "",
-             f"Genere le {r['created']} par RL Studio {r['version']} : {r['n_train']} transitions d'apprentissage, {r['n_val']} de validation, pas {r['dt']:g} s.", "",
-             "Fidelite en simulation libre : 1 = trajectoire reproduite, 0 = aussi mauvais qu'une valeur constante (episodes jamais vus).", "",
-             "| Modele | Complexite | R2 un pas | Fidelite sim. libre | NRMSE | |", "|---|---:|---:|---:|---:|---|"]
+    lines = [f"# Modèle réduit identifié - {r['project']}", "",
+             f"Généré le {r['created']} par RL Studio {r['version']} : {r['n_train']} transitions d'apprentissage, {r['n_val']} de validation, pas {r['dt']:g} s.", "",
+             "Fidélité en simulation libre : 1 = trajectoire reproduite, 0 = aussi mauvais qu'une valeur constante (épisodes jamais vus).", "",
+             "| Modèle | Complexité | R2 un pas | Fidélité sim. libre | NRMSE | |", "|---|---:|---:|---:|---:|---|"]
     for c in r["candidates"]:
         lines.append(f"| {c['label']} | {c['complexity']} | {c['r2_one_step']:.4f} | {c['free_r2']:.4f} | {c['nrmse']:.3f} | {'recommande' if c['id'] == r['recommended'] else ''} |")
     rec = next(c for c in r["candidates"] if c["id"] == r["recommended"])
-    lines += ["", f"## Modele recommande : {rec['label']}", "", "```", *rec["equations"], "```", "",
-              "Erreur normalisee (NRMSE) par horizon de prediction (en pas) : " + ", ".join(f"{h} : {v:.3f}" for h, v in rec["nrmse_by_horizon"].items())]
+    lines += ["", f"## Modèle recommande : {rec['label']}", "", "```", *rec["equations"], "```", "",
+              "Erreur normalisée (NRMSE) par horizon de prediction (en pas) : " + ", ".join(f"{h} : {v:.3f}" for h, v in rec["nrmse_by_horizon"].items())]
     if r["learning_curve"]:
-        lines += ["", "## Courbe d'apprentissage (polynome degre 2, donnees neuves)", ""] + [f"- {p['transitions']} transitions : {p['free_r2_poly2']:.3f}" for p in r["learning_curve"]]
+        lines += ["", "## Courbe d'apprentissage (polynôme degré 2, données neuves)", ""] + [f"- {p['transitions']} transitions : {p['free_r2_poly2']:.3f}" for p in r["learning_curve"]]
     return "\n".join(lines + ["", "## Points d'attention", ""] + [f"- {n}" for n in r["notes"]]) + "\n"
 
 
@@ -262,15 +263,15 @@ def write_report(report: dict, out_dir: Path):
 
 
 def _steady_markdown(r: dict) -> str:
-    lines = [f"# Modele entrees -> sorties en regime permanent - {r['project']}", "",
-             f"Genere le {r['created']} par RL Studio {r['version']} : {r['n_train']} points d'apprentissage, {r['n_val']} de validation, "
+    lines = [f"# Modèle entrées -> sorties en régime permanent - {r['project']}", "",
+             f"Généré le {r['created']} par RL Studio {r['version']} : {r['n_train']} points d'apprentissage, {r['n_val']} de validation, "
              f"{r['dropped']} ecarte(s) ; stabilisation en {r['mean_settle_steps']:.1f} pas en moyenne.", "",
-             f"Entrees : {', '.join(r['in_names'])} ; sorties : {', '.join(r['out_names'])}.", "",
+             f"Entrées : {', '.join(r['in_names'])} ; sorties : {', '.join(r['out_names'])}.", "",
              "R2 sur des points jamais vus : 1 = carte reproduite, 0 = aussi mauvais qu'une valeur moyenne.", "",
-             "| Modele | Complexite | R2 | NRMSE | Erreur max | |", "|---|---:|---:|---:|---:|---|"]
+             "| Modèle | Complexité | R2 | NRMSE | Erreur max | |", "|---|---:|---:|---:|---:|---|"]
     for c in r["candidates"]:
         lines.append(f"| {c['label']} | {c['complexity']} | {c['r2']:.4f} | {c['nrmse']:.3f} | {c['max_abs_err']:.2f} | {'recommande' if c['id'] == r['recommended'] else ''} |")
     rec = next(c for c in r["candidates"] if c["id"] == r["recommended"])
-    lines += ["", f"## Modele recommande : {rec['label']}", "", "```", *rec["equations"], "```", "",
+    lines += ["", f"## Modèle recommande : {rec['label']}", "", "```", *rec["equations"], "```", "",
               "R2 par sortie : " + ", ".join(f"{k} : {v:.3f}" for k, v in rec["r2_by_output"].items())]
     return "\n".join(lines + ["", "## Points d'attention", ""] + [f"- {n}" for n in r["notes"]]) + "\n"

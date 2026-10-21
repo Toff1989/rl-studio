@@ -65,7 +65,7 @@ def resolve_device(requested: str, gpu_enabled: bool, log) -> str:
     if requested == "auto":
         return "cuda" if cuda else "cpu"
     if requested == "cuda" and not cuda:
-        log("CUDA indisponible : entrainement sur CPU.")
+        log("CUDA indisponible : entraînement sur CPU.")
         return "cpu"
     return requested
 
@@ -172,7 +172,7 @@ def cmd_export_identify_simulink(args):
     project = Project(args.project)
     report_dir = identify_dir(project) / args.report
     if not (report_dir / args.candidate / "model.json").is_file():
-        raise FileNotFoundError(f"modele introuvable : {args.report}/{args.candidate}")
+        raise FileNotFoundError(f"modèle introuvable : {args.report}/{args.candidate}")
     out = build_simulink(load_candidate(report_dir, args.candidate), args.out, log=lambda m: emit(type="log", text=m))
     emit(type="result", path=str(out))
 
@@ -250,7 +250,7 @@ def cmd_analyze_model(args):
 
     session = MatlabSession()
     try:
-        emit(type="log", text="Analyse du modele...")
+        emit(type="log", text="Analyse du modèle...")
         analysis = session.analyze(args.model, args.init or "")
         emit(type="result", analysis=analysis, proposal=default_spec(analysis))
     finally:
@@ -258,7 +258,7 @@ def cmd_analyze_model(args):
 
 
 def _check_environment(project_dir, env_cfg, session, steps=3):
-    """Test a vide : reset + quelques pas a l'action mediane ; renvoie un dict {ok, ...} sans lever d'exception."""
+    """Test à vide : reset + quelques pas a l'action mediane ; renvoie un dict {ok, ...} sans lever d'exception."""
     import numpy as np
 
     from .envs.simulink import SimulinkEnv
@@ -292,22 +292,22 @@ def cmd_convert_model(args):
     spec = json.loads(Path(args.spec).read_text(encoding="utf-8"))
     errs = validate_conversion(spec)
     if errs:
-        raise ValueError("Specification invalide :\n- " + "\n- ".join(errs))
+        raise ValueError("Spécification invalide :\n- " + "\n- ".join(errs))
     out_dir = Path(args.out)
     if out_dir.exists():
-        raise FileExistsError(f"Le dossier existe deja : {out_dir}")
+        raise FileExistsError(f"Le dossier existe déjà : {out_dir}")
     out_dir.mkdir(parents=True)
     session = MatlabSession()
     try:
         try:
             model_name = Path(spec["model_path"]).stem
-            emit(type="log", text="Conversion du modele (copie : l'original n'est pas modifie)...")
+            emit(type="log", text="Conversion du modèle (copie : l'original n'est pas modifié)...")
             result = session.convert(spec["model_path"], out_dir / f"{model_name}.slx", matlab_spec(spec), spec.get("init_path") or "")
             cfg = write_project(out_dir, spec, result)
         except Exception:
             shutil.rmtree(out_dir, ignore_errors=True)  # pas de projet a moitie cree
             raise
-        emit(type="log", text="Test a vide : un episode court sur le modele converti...")
+        emit(type="log", text="Test à vide : un épisode court sur le modèle converti...")
         check = _check_environment(out_dir, cfg["env"], session)
         emit(type="result", slug=out_dir.name, project_dir=str(out_dir), warnings=result.get("warnings") or [], check=check)
     finally:
@@ -371,7 +371,7 @@ def main(argv=None):
     p.add_argument("--model", required=True)
     p.add_argument("--init")
     p = sub.add_parser("convert-model")
-    p.add_argument("--spec", required=True, help="fichier JSON de la specification (voir convert.py)")
+    p.add_argument("--spec", required=True, help="fichier JSON de la spécification (voir convert.py)")
     p.add_argument("--out", required=True, help="dossier du nouveau projet (ne doit pas exister)")
     sub.add_parser("env-info")
     p = sub.add_parser("distill")
@@ -394,7 +394,7 @@ def main(argv=None):
     p.add_argument("--policy", default="agent")
     p.add_argument("--episodes", type=int, default=5)
     p.add_argument("--seed", type=int, default=1000)
-    p.add_argument("--delay", type=float, default=0.0, help="pause par pas (s), pour suivre l'episode a l'oeil")
+    p.add_argument("--delay", type=float, default=0.0, help="pause par pas (s), pour suivre l'épisode à l'oeil")
     p = sub.add_parser("export-simulink")
     p.add_argument("--project", required=True)
     p.add_argument("--run", required=True)

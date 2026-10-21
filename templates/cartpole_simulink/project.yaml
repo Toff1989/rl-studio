@@ -1,7 +1,7 @@
 template_name: Pendule inverse (Simulink)
-template_description: "Pendule inverse sur chariot modelise dans Simulink (modele MIT de Jitendra Singh, adapte). Exemple complet de projet Simulink : action = force du chariot, 4 observations, etat initial aleatoire, recompense et arret anticipe en expressions."
+template_description: "Pendule inverse sur chariot modélisé dans Simulink (modèle MIT de Jitendra Singh, adapté). Exemple complet de projet Simulink : action = force du chariot, 4 observations, état initial aléatoire, récompense et arrêt anticipé en expressions."
 name: Pendule inverse (Simulink)
-description: Maintenir le pendule vertical en poussant le chariot. Modele physique dans pendulum.slx (voir SOURCE.md pour l'origine et la licence).
+description: Maintenir le pendule vertical en poussant le chariot. Modèle physique dans pendulum.slx (voir SOURCE.md pour l'origine et la licence).
 kind: simulink
 env:
   model: pendulum.slx

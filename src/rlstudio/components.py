@@ -16,7 +16,7 @@ from pathlib import Path
 from . import hardware
 from .paths import FROZEN, RUNTIME_DIR, VENDOR_DIR
 
-BUNDLED_PYTHON = "3.12"  # version du Python embarque dans l'installateur
+BUNDLED_PYTHON = "3.12"  # version du Python embarqué dans l'installateur
 # index PyTorch par ordre decroissant : (suffixe, version CUDA correspondante)
 TORCH_INDEXES = [("cu130", (13, 0)), ("cu128", (12, 8)), ("cu126", (12, 6))]
 TORCH_URL = "https://download.pytorch.org/whl/{}"
@@ -35,20 +35,20 @@ def _ver(text):
 def plan_torch(hw: dict, gpu_enabled=True) -> dict:
     nvidia = [g for g in hw.get("gpus") or [] if g.get("vendor") == "NVIDIA"]
     if not gpu_enabled:
-        return {"variant": "cpu", "candidates": [], "reason": "GPU desactive dans les parametres."}
+        return {"variant": "cpu", "candidates": [], "reason": "GPU desactive dans les paramètres."}
     if not nvidia:
-        return {"variant": "cpu", "candidates": [], "reason": "Aucune carte NVIDIA detectee : PyTorch CPU."}
+        return {"variant": "cpu", "candidates": [], "reason": "Aucune carte NVIDIA détectée : PyTorch CPU."}
     driver_cuda = _ver(hw.get("cuda_driver"))
     if not driver_cuda:
         return {"variant": "cpu", "candidates": [],
-                "reason": "Version CUDA du pilote inconnue : PyTorch CPU (mettre a jour le pilote NVIDIA)."}
+                "reason": "Version CUDA du pilote inconnue : PyTorch CPU (mettre à jour le pilote NVIDIA)."}
     cc = _ver(nvidia[0].get("compute_cap"))
     minimum = MIN_CUDA_BLACKWELL if cc and cc >= (12, 0) else (11, 8)
     candidates = [name for name, v in TORCH_INDEXES if minimum <= v <= driver_cuda]
     if not candidates:
         return {"variant": "cpu", "candidates": [],
                 "reason": f"{nvidia[0]['name']} demande CUDA >= {minimum[0]}.{minimum[1]} mais le pilote "
-                          f"n'offre que CUDA {driver_cuda[0]}.{driver_cuda[1]} : mettre a jour le pilote NVIDIA. "
+                          f"n'offre que CUDA {driver_cuda[0]}.{driver_cuda[1]} : mettre à jour le pilote NVIDIA. "
                           "PyTorch CPU en attendant."}
     return {"variant": candidates[0], "candidates": candidates,
             "reason": f"{nvidia[0]['name']} + pilote CUDA {driver_cuda[0]}.{driver_cuda[1]} : PyTorch {candidates[0]}."}
@@ -56,16 +56,16 @@ def plan_torch(hw: dict, gpu_enabled=True) -> dict:
 
 def plan_matlab(hw: dict, enabled=True, root="") -> dict:
     if not enabled:
-        return {"enabled": False, "reason": "MATLAB desactive dans les parametres."}
+        return {"enabled": False, "reason": "MATLAB désactivé dans les paramètres."}
     installs = list(hw.get("matlab") or [])
     if root:
         info = next((m for m in installs if Path(m["root"]) == Path(root)), None) or hardware.inspect_matlab(root)
         installs = [info] if info else []
     usable = [m for m in installs if m.get("complete") and m.get("engine_series")]
     if not usable:
-        why = "Aucune installation MATLAB complete detectee."
+        why = "Aucune installation MATLAB complete détectée."
         if any(not m.get("complete") for m in installs):
-            why = "Installation(s) MATLAB incomplete(s) : reinstaller MATLAB (avec Simulink)."
+            why = "Installation(s) MATLAB incomplete(s) : réinstaller MATLAB (avec Simulink)."
         return {"enabled": False, "reason": why}
     m = usable[0]
     py_ok = not m.get("engine_python_versions") or BUNDLED_PYTHON in m["engine_python_versions"]
@@ -87,7 +87,7 @@ def make_plan(hw: dict, gpu_enabled=True, matlab_enabled=True, matlab_root="") -
 
 
 def plan_summary(plan: dict) -> str:
-    return "\n".join([f"Python embarque : {plan['python']}",
+    return "\n".join([f"Python embarqué : {plan['python']}",
                       f"PyTorch : {plan['torch']['variant']} - {plan['torch']['reason']}",
                       f"MATLAB : {plan['matlab'].get('reason', '-')}"])
 
@@ -107,13 +107,13 @@ def runtime_python(runtime_dir=None) -> Path | None:
         return None
 
 
-# Le Python embarque active `site` (necessaire a pip) et ajoute alors le site-packages UTILISATEUR :
+# Le Python embarqué active `site` (necessaire a pip) et ajoute alors le site-packages UTILISATEUR :
 # pip y verrait les paquets de l'utilisateur (et pourrait les desinstaller !). On l'ecarte de trois facons.
 SITECUSTOMIZE = """import os, site, sys
 site.ENABLE_USER_SITE = False
 _user = os.path.normcase(site.getusersitepackages() or "?")
 sys.path[:] = [p for p in sys.path if not os.path.normcase(p).startswith(_user)]
-# Un Python embarque (fichier ._pth) tourne en mode isole et ignore PYTHONPATH : le code de
+# Un Python embarqué (fichier ._pth) tourne en mode isolé et ignore PYTHONPATH : le code de
 # l'application est donc ajoute ici, depuis RLSTUDIO_LIB.
 _lib = os.environ.get("RLSTUDIO_LIB")
 if _lib and _lib not in sys.path:
@@ -146,7 +146,7 @@ def _stream(cmd, log, env=None, cwd=None) -> int:
 
 
 def create_runtime(runtime_dir: Path, log, vendor_dir=None) -> tuple[Path, str]:
-    """Cree le Python du runtime : Python embarque (installateur) ou venv (poste de developpement)."""
+    """Créé le Python du runtime : Python embarqué (installateur) ou venv (poste de developpement)."""
     vendor = Path(vendor_dir or VENDOR_DIR)
     embed = next(iter(sorted(vendor.glob("python-*-embed-amd64.zip"))), None)
     runtime_dir.mkdir(parents=True, exist_ok=True)
@@ -169,14 +169,14 @@ def create_runtime(runtime_dir: Path, log, vendor_dir=None) -> tuple[Path, str]:
             if not getpip.exists():
                 raise RuntimeError(f"get-pip.py introuvable dans {vendor}")
             if _stream([py, getpip, "--no-warn-script-location"], log) != 0:
-                raise RuntimeError("Installation de pip echouee.")
+                raise RuntimeError("Installation de pip échouée.")
         return py, "embed"
     if FROZEN:
-        raise RuntimeError(f"Python embarque introuvable dans {vendor} : reinstaller l'application.")
+        raise RuntimeError(f"Python embarqué introuvable dans {vendor} : réinstaller l'application.")
     venv = runtime_dir / "venv"
     if not (venv / "Scripts" / "python.exe").exists() and not (venv / "bin" / "python").exists():
         if _stream([sys.executable, "-m", "venv", venv], log) != 0:
-            raise RuntimeError("Creation du venv echouee.")
+            raise RuntimeError("Création du venv échouée.")
     return (venv / "Scripts" / "python.exe" if (venv / "Scripts").exists() else venv / "bin" / "python"), "venv"
 
 
@@ -206,7 +206,7 @@ def provision(plan: dict, runtime_dir=None, log=print, skip=(), dry_run=False, v
     req_file = Path(vendor_dir or VENDOR_DIR) / "requirements-runtime.txt"
     base = ["-r", req_file] if req_file.exists() else BASE_REQUIREMENTS
     if "base" not in skip:
-        steps.append(("Bibliotheques de base", pip(py, ["--upgrade", *base])))
+        steps.append(("Bibliothèques de base", pip(py, ["--upgrade", *base])))
 
     ml = plan.get("matlab", {})
     if "matlab" not in skip and ml.get("enabled") and ml.get("engine_spec"):
@@ -230,9 +230,9 @@ def provision(plan: dict, runtime_dir=None, log=print, skip=(), dry_run=False, v
             if ok:
                 result["torch_variant"] = title.split()[-1]
         elif not ok:
-            result["errors"].append(f"{title} : echec")
+            result["errors"].append(f"{title} : échec")
     if not torch_done and "torch" not in skip and not dry_run:
-        result["errors"].append("PyTorch : aucune variante n'a pu etre installee")
+        result["errors"].append("PyTorch : aucune variante n'a pu être installée")
     if not dry_run:
         runtime_info_path(runtime_dir).write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
     return result

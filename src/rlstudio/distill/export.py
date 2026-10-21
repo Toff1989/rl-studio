@@ -5,6 +5,7 @@ import json
 import time
 from pathlib import Path
 
+from ..textutil import ascii_safe
 from .surrogates import M_RESERVED, Surrogate, clean_names, surrogate_from_dict
 
 
@@ -17,7 +18,7 @@ def write_candidate(dirpath: Path, sur: Surrogate) -> dict:
     dirpath.mkdir(parents=True, exist_ok=True)
     files = {"python": "policy.py", "matlab": "policy.m", "equations": "equations.txt", "json": "surrogate.json"}
     (dirpath / "policy.py").write_text(sur.to_python("policy"), encoding="utf-8")
-    (dirpath / "policy.m").write_text(sur.to_matlab("policy"), encoding="utf-8")
+    (dirpath / "policy.m").write_text(ascii_safe(sur.to_matlab("policy")), encoding="utf-8")
     (dirpath / "equations.txt").write_text(sur.title() + "\n\n" + "\n".join(sur.equations()) + "\n", encoding="utf-8")
     (dirpath / "surrogate.json").write_text(json.dumps(sur.to_dict()), encoding="utf-8")
     return files
@@ -39,12 +40,12 @@ def load_report(run_dir) -> dict | None:
 
 def report_markdown(report: dict) -> str:
     ex = report["expert"]
-    lines = [f"# Modele mathematique extrait - {report['project']}", "",
-             f"Run `{report['run']}` ({report['algo']}), genere le {report['created']} par RL Studio {report['version']}.", "",
-             f"- Retour moyen de la politique apprise : **{ex['return_mean']:.3f}** (ecart-type {ex['return_std']:.3f}), "
-             f"politique aleatoire : {report['random_return']:.3f}",
-             f"- Score normalise : 0 = aleatoire, 1 = politique apprise ; tolerance : {report['options']['margin'] * 100:.0f} %",
-             "", "| Modele | Complexite | R2 (etats de l'expert) | R2 (etats visites) | Retour | Score | Menes a terme | |",
+    lines = [f"# Modèle mathématique extrait - {report['project']}", "",
+             f"Run `{report['run']}` ({report['algo']}), généré le {report['created']} par RL Studio {report['version']}.", "",
+             f"- Retour moyen de la politique apprise : **{ex['return_mean']:.3f}** (écart-type {ex['return_std']:.3f}), "
+             f"politique aléatoire : {report['random_return']:.3f}",
+             f"- Score normalise : 0 = aléatoire, 1 = politique apprise ; tolérance : {report['options']['margin'] * 100:.0f} %",
+             "", "| Modèle | Complexité | R2 (états de l'expert) | R2 (états visites) | Retour | Score | Menés à terme | |",
              "|---|---:|---:|---:|---:|---:|---:|---|"]
     for c in report["candidates"]:
         star = "recommande" if c["id"] == report["recommended"] else ""
@@ -52,7 +53,7 @@ def report_markdown(report: dict) -> str:
                      f"{c['score']:.3f} | {c['completed_rate'] * 100:.0f} % | {star} |")
     rec = next((c for c in report["candidates"] if c["id"] == report["recommended"]), None)
     if rec:
-        lines += ["", f"## Modele recommande : {rec['label']}", "", "```", *rec["equations"], "```", "",
+        lines += ["", f"## Modèle recommande : {rec['label']}", "", "```", *rec["equations"], "```", "",
                   f"Fichiers : `{rec['id']}/policy.py`, `{rec['id']}/policy.m`, `{rec['id']}/equations.txt`."]
     if report["notes"]:
         lines += ["", "## Points d'attention", ""] + [f"- {n}" for n in report["notes"]]
@@ -70,20 +71,20 @@ def write_report(report: dict, run_dir) -> Path:
 def build_simulink_controller(sur: Surrogate, out_slx, sample_time=None, session=None, log=print) -> Path:
     """Genere un modele Simulink contenant le controleur : une entree par observation, une sortie par action.
 
-    Necessite MATLAB (via le moteur Python). Un modele a etat (integrale) recoit un pas d'echantillonnage."""
+    Necessite MATLAB (via le moteur Python). Un modele a etat (integrale) recoit un pas d'échantillonnage."""
     from ..envs.simulink import MatlabSession
 
     out = Path(out_slx).resolve()
     out.parent.mkdir(parents=True, exist_ok=True)
     ts = sample_time if sample_time else (getattr(sur, "dt", None) if sur.stateful else None)
     spec = {"obs_names": clean_names(sur.obs_names, M_RESERVED), "act_names": clean_names(sur.act_names, M_RESERVED),
-            "code": sur.to_matlab("fcn"), "sample_time": float(ts) if ts else -1.0}
+            "code": ascii_safe(sur.to_matlab("fcn")), "sample_time": float(ts) if ts else -1.0}
     spec_file = out.with_suffix(".spec.json")
     spec_file.write_text(json.dumps(spec), encoding="utf-8")
     own = session is None
     session = session or MatlabSession()
     try:
-        log(f"Generation du controleur Simulink : {out}")
+        log(f"Génération du contrôleur Simulink : {out}")
         session.eng.rlstudio_build_controller(str(out), str(spec_file), nargout=0)
     finally:
         if own:

@@ -193,5 +193,5 @@ def steady_sweep(env, design, seed0, rtol=1e-3, atol=1e-6, window=3, max_steps=N
         if on_point:
             on_point(k + 1, len(design))
     if data is None:
-        raise ValueError("Plan d'experience vide.")
+        raise ValueError("Plan d'expérience vide.")
     return data

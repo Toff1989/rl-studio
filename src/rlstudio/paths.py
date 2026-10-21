@@ -5,7 +5,7 @@ Disposition de l'application installee (identique au dossier `dist/rlstudio` du 
     rlstudio.exe, rlstudio-tools.exe   interface et outils console
     resources/{templates,matlab}       modeles de projets et scripts MATLAB
     lib/rlstudio/                      code Python pur, utilise par le runtime de calcul
-    vendor/                            Python embarque, get-pip.py, requirements-runtime.txt
+    vendor/                            Python embarqué, get-pip.py, requirements-runtime.txt
 """
 import os
 import sys

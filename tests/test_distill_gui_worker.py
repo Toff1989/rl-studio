@@ -33,7 +33,7 @@ def test_worker_distill_emits_progress_and_report(trained):
     prog = [e for e in events if e["type"] == "progress"]
     assert len(prog) >= 6, "un evenement par episode simule"
     fr = [e["fraction"] for e in prog]
-    assert fr == sorted(fr) and fr[-1] <= 1.0 and any("episode" in e["stage"] for e in prog)
+    assert fr == sorted(fr) and fr[-1] <= 1.0 and any("pisode" in e["stage"] for e in prog)
     done = events[-1]
     assert done["type"] == "done" and not done["stopped"] and done["recommended"]
     assert (run_dir / "distill" / "report.json").exists()

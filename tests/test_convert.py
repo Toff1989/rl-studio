@@ -51,9 +51,9 @@ def test_validate_conversion_ok_and_errors():
     dup = _spec(observations=[{"name": "u", "path": "m/y", "port": 1}])
     assert any("uniques" in e for e in convert.validate_conversion(dup))
     assert any("invalide" in e for e in convert.validate_conversion(_spec(observations=[{"name": "a b", "path": "m/y"}])))
-    assert any("Recompense" in e for e in convert.validate_conversion(_spec(reward="-(z - 1)**2")))  # nom inconnu
+    assert any("Récompense" in e for e in convert.validate_conversion(_spec(reward="-(z - 1)**2")))  # nom inconnu
     assert any("pas du solveur" in e.lower() for e in convert.validate_conversion(_spec(solver_step=1.0)))
-    assert any("episode" in e.lower() for e in convert.validate_conversion(_spec(episode_s=0.1)))
+    assert any("pisode" in e.lower() for e in convert.validate_conversion(_spec(episode_s=0.1)))
     assert any("recompense" in e.lower() for e in convert.validate_conversion(_spec(reward="")))
 
 

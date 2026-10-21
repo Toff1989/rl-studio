@@ -21,7 +21,7 @@ from .runner import WorkerJob
 from .theme import C
 from .widgets import Card, button, label
 
-STEPS = ["Modele", "Actions", "Observations", "Reglages"]
+STEPS = ["Modèle", "Actions", "Observations", "Réglages"]
 
 
 class RowTable(QTableWidget):
@@ -97,7 +97,7 @@ class ConvertDialog(QDialog):
         self.analysis = None
         self._job = None
         self._spec_file = None
-        self.setWindowTitle("Convertir un modele Simulink")
+        self.setWindowTitle("Convertir un modèle Simulink")
         self.resize(1000, 740)
 
         self.steps_lbl = QLabel()
@@ -105,7 +105,7 @@ class ConvertDialog(QDialog):
         self.stack = QStackedWidget()
         for page in (self._page_model(), self._page_actions(), self._page_observations(), self._page_settings()):
             self.stack.addWidget(page)
-        self.btn_back = button("Precedent", None, self._back)
+        self.btn_back = button("Précédent", None, self._back)
         self.btn_next = button("Suivant", "primary", self._next)
         self.btn_cancel = button("Annuler", "ghost", self.reject)
         self.status = label("", "muted", wrap=True)
@@ -117,9 +117,9 @@ class ConvertDialog(QDialog):
         lay = QVBoxLayout(self)
         lay.setContentsMargins(24, 20, 24, 20)
         lay.setSpacing(14)
-        lay.addWidget(label("Convertir un modele Simulink", "h1"))
-        lay.addWidget(label("Prepare un modele existant pour RL Studio. Le fichier d'origine n'est pas modifie : "
-                            "une copie convertie est enregistree dans un nouveau projet.", "hint", wrap=True))
+        lay.addWidget(label("Convertir un modèle Simulink", "h1"))
+        lay.addWidget(label("Prépare un modèle existant pour RL Studio. Le fichier d'origine n'est pas modifié : "
+                            "une copie convertie est enregistrée dans un nouveau projet.", "hint", wrap=True))
         lay.addWidget(self.steps_lbl)
         lay.addWidget(self.stack, 1)
         lay.addLayout(foot)
@@ -128,18 +128,18 @@ class ConvertDialog(QDialog):
     # ------------------------------------------------------------------ pages
     def _page_model(self):
         self.f_model = QLineEdit()
-        self.f_model.setPlaceholderText("Modele Simulink (.slx ou .mdl)")
+        self.f_model.setPlaceholderText("Modèle Simulink (.slx ou .mdl)")
         self.f_init = QLineEdit()
-        self.f_init.setPlaceholderText("Optionnel : script .m ou fichier .mat qui definit les variables du modele")
-        self.btn_analyze = button("Analyser le modele", "primary", self._analyze)
+        self.f_init.setPlaceholderText("Optionnel : script .m ou fichier .mat qui définit les variables du modèle")
+        self.btn_analyze = button("Analyser le modèle", "primary", self._analyze)
         r1, r2 = QHBoxLayout(), QHBoxLayout()
         r1.addWidget(self.f_model, 1)
-        r1.addWidget(button("Parcourir...", None, lambda: self._browse(self.f_model, "Modele Simulink", "Simulink (*.slx *.mdl)")))
+        r1.addWidget(button("Parcourir...", None, lambda: self._browse(self.f_model, "Modèle Simulink", "Simulink (*.slx *.mdl)")))
         r2.addWidget(self.f_init, 1)
         r2.addWidget(button("Parcourir...", None, lambda: self._browse(self.f_init, "Script d'initialisation",
                                                                         "MATLAB (*.m *.mat)")))
-        pick = Card("Modele a convertir", "Le script d'initialisation est execute tel quel dans MATLAB avant l'analyse : "
-                                          "indique-le si le modele utilise des variables definies hors du .slx.")
+        pick = Card("Modèle à convertir", "Le script d'initialisation est exécuté tel quel dans MATLAB avant l'analyse : "
+                                          "indique-le si le modèle utilise des variables définies hors du .slx.")
         pick.body.addLayout(r1)
         pick.body.addLayout(r2)
         pick.body.addWidget(self.btn_analyze, 0, Qt.AlignLeft)
@@ -152,10 +152,10 @@ class ConvertDialog(QDialog):
         self.warnings.setPlaceholderText("Les avertissements de l'analyse s'affichent ici.")
         self.removable = QListWidget()
         self.removable.setMaximumHeight(120)
-        res = Card("Resultat de l'analyse")
+        res = Card("Résultat de l'analyse")
         res.body.addWidget(self.summary)
         res.body.addWidget(self.warnings)
-        res.body.addWidget(label("Blocs a retirer de la copie (affichages, liens casses) :", "hint"))
+        res.body.addWidget(label("Blocs à retirer de la copie (affichages, liens cassés) :", "hint"))
         res.body.addWidget(self.removable)
         w = QWidget()
         v = QVBoxLayout(w)
@@ -171,12 +171,12 @@ class ConvertDialog(QDialog):
                                    ("kind", "Type", "ro"), ("default", "Valeur init.", "float"),
                                    ("low", "Min", "float"), ("high", "Max", "float")])
         row = QHBoxLayout()
-        row.addWidget(button("Ajouter un parametre de bloc...", None, self._explore))
+        row.addWidget(button("Ajouter un paramètre de bloc...", None, self._explore))
         row.addWidget(button("Retirer la ligne", "ghost", self.t_actions.remove_selected))
         row.addStretch(1)
         card = Card("Actions : ce que l'agent commande",
-                    "Chaque entree du modele devient une constante pilotable par l'agent ; un parametre de bloc "
-                    "(ex. le gain d'un bloc Gain) est modifie en direct. Le min et le max bornent l'action.")
+                    "Chaque entrée du modèle devient une constante pilotable par l'agent ; un paramètre de bloc "
+                    "(ex. le gain d'un bloc Gain) est modifié en direct. Le min et le max bornent l'action.")
         card.body.addWidget(self.t_actions, 1)
         card.body.addLayout(row)
         return card
@@ -189,15 +189,15 @@ class ConvertDialog(QDialog):
         orow.addWidget(button("Retirer la ligne", "ghost", self.t_obs.remove_selected))
         orow.addStretch(1)
         cobs = Card("Observations : ce que l'agent voit",
-                    "Les sorties du modele sont proposees ; tu peux ajouter n'importe quel signal. Une sortie est "
-                    "remplacee par le bloc qui l'alimente.")
+                    "Les sorties du modèle sont proposées ; tu peux ajouter n'importe quel signal. Une sortie est "
+                    "remplacée par le bloc qui l'alimente.")
         cobs.body.addWidget(self.t_obs, 1)
         cobs.body.addLayout(orow)
         self.t_init = RowTable([("use", "Utiliser", "check"), ("variable", "Variable", "ro"), ("value", "Valeur actuelle", "ro"),
                                 ("low", "Min", "float"), ("high", "Max", "float")])
-        cinit = Card("Variables initiales aleatoires (optionnel)",
-                     "Variables du modele tirees au hasard a chaque episode (ex. angle de depart). Les variables definies "
-                     "hors du .slx sont de toute facon copiees dans le modele converti.")
+        cinit = Card("Variables initiales aléatoires (optionnel)",
+                     "Variables du modèle tirées au hasard à chaque épisode (ex. angle de départ). Les variables définies "
+                     "hors du .slx sont de toute façon copiées dans le modèle converti.")
         cinit.body.addWidget(self.t_init, 1)
         w = QWidget()
         v = QVBoxLayout(w)
@@ -220,8 +220,8 @@ class ConvertDialog(QDialog):
         self.s_episode.setValue(100.0)
         self.s_episode.setSuffix(" s")
         self.c_solver = QComboBox()
-        self.c_solver.addItem("Pas fixe (recommande : l'etat se conserve d'un pas de decision a l'autre)", "fixed")
-        self.c_solver.addItem("Garder le solveur du modele", "keep")
+        self.c_solver.addItem("Pas fixe (recommandé : l'état se conserve d'un pas de décision à l'autre)", "fixed")
+        self.c_solver.addItem("Garder le solveur du modèle", "keep")
         self.s_solver = QDoubleSpinBox()
         self.s_solver.setDecimals(6)
         self.s_solver.setRange(1e-6, 1e6)
@@ -237,17 +237,17 @@ class ConvertDialog(QDialog):
         form.setLabelAlignment(Qt.AlignLeft)
         form.setSpacing(10)
         form.addRow("Nom du projet", self.f_name)
-        form.addRow("Pas de decision", self.s_step)
-        form.addRow("Duree d'un episode", self.s_episode)
+        form.addRow("Pas de décision", self.s_step)
+        form.addRow("Durée d'un épisode", self.s_episode)
         form.addRow("Solveur", self.c_solver)
         form.addRow("Pas du solveur", self.s_solver)
-        c1 = Card("Reglages", "Le pas de decision est le temps simule entre deux actions de l'agent.")
+        c1 = Card("Réglages", "Le pas de décision est le temps simulé entre deux actions de l'agent.")
         c1.body.addLayout(form)
         form2 = QFormLayout()
         form2.setSpacing(10)
-        form2.addRow("Recompense", self.f_reward)
-        form2.addRow("Arret anticipe", self.f_term)
-        c2 = Card("Recompense", "Expression calculee a chaque pas : plus elle est grande, mieux c'est.")
+        form2.addRow("Récompense", self.f_reward)
+        form2.addRow("Arrêt anticipé", self.f_term)
+        c2 = Card("Récompense", "Expression calculée à chaque pas : plus elle est grande, mieux c'est.")
         c2.body.addLayout(form2)
         c2.body.addWidget(self.names_hint)
         c2.body.addWidget(self.check_lbl)
@@ -272,7 +272,7 @@ class ConvertDialog(QDialog):
         self.steps_lbl.setText("&nbsp;&nbsp;&rsaquo;&nbsp;&nbsp;".join(parts))
         self.btn_back.setEnabled(i > 0 and self._job is None)
         last = i == len(STEPS) - 1
-        self.btn_next.setText("Convertir et creer le projet" if last else "Suivant")
+        self.btn_next.setText("Convertir et créer le projet" if last else "Suivant")
         self.btn_next.setEnabled(self._job is None and (i > 0 or self.analysis is not None))
         if i == 3:
             self._prepare_settings()
@@ -289,7 +289,7 @@ class ConvertDialog(QDialog):
                 self._obs_spec()
                 self._initial_spec()
         except ValueError as e:
-            QMessageBox.warning(self, "Convertir un modele", str(e))
+            QMessageBox.warning(self, "Convertir un modèle", str(e))
             return
         if i == len(STEPS) - 1:
             self._convert()
@@ -319,12 +319,12 @@ class ConvertDialog(QDialog):
     def _analyze(self):
         model = self.f_model.text().strip()
         if not model or not Path(model).is_file():
-            QMessageBox.warning(self, "Convertir un modele", "Choisis d'abord un fichier de modele Simulink.")
+            QMessageBox.warning(self, "Convertir un modèle", "Choisis d'abord un fichier de modèle Simulink.")
             return
         args = ["analyze-model", "--model", model]
         if self.f_init.text().strip():
             args += ["--init", self.f_init.text().strip()]
-        self._busy(True, "Analyse du modele dans MATLAB (quelques dizaines de secondes)...")
+        self._busy(True, "Analyse du modèle dans MATLAB (quelques dizaines de secondes)...")
         self._job = WorkerJob(self.settings, args, self)
         self._job.done.connect(self._analyzed)
         self._job.start()
@@ -361,7 +361,7 @@ class ConvertDialog(QDialog):
         self.t_actions.setRowCount(0)
         self.t_actions.meta = []
         for act in proposal.get("actions") or []:
-            self.t_actions.add_row({"name": act["name"], "source": act["path"], "kind": "Entree du modele",
+            self.t_actions.add_row({"name": act["name"], "source": act["path"], "kind": "Entrée du modèle",
                                     "default": float(act.get("default", 0.0)), "low": float(act["low"]),
                                     "high": float(act["high"])}, meta=act)
         taken = {x["name"] for x in proposal.get("actions") or []} | {x["name"] for x in proposal.get("observations") or []}
@@ -417,7 +417,7 @@ class ConvertDialog(QDialog):
         model = self.f_model.text().strip()
         if not model or not Path(model).is_file():
             return
-        self._busy(True, "Lecture des blocs du modele...")
+        self._busy(True, "Lecture des blocs du modèle...")
         self._job = WorkerJob(self.settings, ["inspect", "--model", model], self)
         self._job.done.connect(self._explored)
         self._job.start()
@@ -427,7 +427,7 @@ class ConvertDialog(QDialog):
         self._busy(False)
         self._go(self.stack.currentIndex())
         if res is None:
-            QMessageBox.critical(self, "MATLAB", f"Impossible d'inspecter le modele :\n{err}")
+            QMessageBox.critical(self, "MATLAB", f"Impossible d'inspecter le modèle :\n{err}")
             return
         dlg = SimulinkExplorer(self, res["blocks"])
         dlg.on_observation = self._add_obs_row
@@ -441,7 +441,7 @@ class ConvertDialog(QDialog):
     def _add_action_row(self, a):
         v = float(a["high"]) / 2 if a["high"] else 0.0
         self.t_actions.add_row({"name": sanitize_name(a["name"], "param"), "source": f"{a['block']} / {a['param']}",
-                                "kind": "Parametre de bloc", "default": v, "low": float(a["low"]), "high": float(a["high"])},
+                                "kind": "Paramètre de bloc", "default": v, "low": float(a["low"]), "high": float(a["high"])},
                                meta={"kind": "param", "path": a["block"], "param": a["param"]})
         self.stack.setCurrentIndex(1)
 
@@ -492,7 +492,7 @@ class ConvertDialog(QDialog):
         try:
             spec = self._spec()
         except ValueError as e:
-            QMessageBox.warning(self, "Convertir un modele", str(e))
+            QMessageBox.warning(self, "Convertir un modèle", str(e))
             return
         errs = validate_conversion(spec)
         if errs:
@@ -507,7 +507,7 @@ class ConvertDialog(QDialog):
         tmp.close()
         self._spec_file = tmp.name
         out_dir = self.store.root / self.store.free_slug(spec["project_name"])
-        self._busy(True, "Conversion et test a vide dans MATLAB (une a deux minutes)...")
+        self._busy(True, "Conversion et test à vide dans MATLAB (une à deux minutes)...")
         self._job = WorkerJob(self.settings, ["convert-model", "--spec", tmp.name, "--out", str(out_dir)], self)
         self._job.done.connect(self._converted)
         self._job.start()
@@ -528,14 +528,14 @@ class ConvertDialog(QDialog):
         if res.get("warnings"):
             lines += ["Avertissements :"] + [f"  - {w}" for w in res["warnings"]] + [""]
         if check.get("ok"):
-            lines += [f"Projet cree et teste : {check['episode_steps']} pas par episode, "
+            lines += [f"Projet créé et testé : {check['episode_steps']} pas par épisode, "
                       f"environ {check['ms_per_step']:.0f} ms de simulation par pas.",
-                      "", "Observations apres le test a vide :"] + [f"  {k} = {v}" for k, v in check["obs"].items()]
-            QMessageBox.information(self, "Conversion terminee", "\n".join(lines))
+                      "", "Observations après le test à vide :"] + [f"  {k} = {v}" for k, v in check["obs"].items()]
+            QMessageBox.information(self, "Conversion terminée", "\n".join(lines))
         else:
-            lines += ["Le projet est cree, mais le test a vide a echoue :", check.get("error", "erreur inconnue"), "",
+            lines += ["Le projet est créé, mais le test à vide a échoué :", check.get("error", "erreur inconnue"), "",
                       "Corrige la configuration dans l'onglet Environnement du projet."]
-            QMessageBox.warning(self, "Conversion terminee avec une erreur", "\n".join(lines))
+            QMessageBox.warning(self, "Conversion terminée avec une erreur", "\n".join(lines))
         self.accept()
 
     def reject(self):

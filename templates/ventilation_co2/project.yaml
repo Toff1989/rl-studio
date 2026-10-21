@@ -1,7 +1,7 @@
-template_name: Ventilation a la demande (CO2)
-template_description: "Salle de reunion : le debit d'air neuf doit garder le CO2 sous 1000 ppm malgre une occupation variable, avec un cout ventilateur + chauffage de l'air neuf. Environnement Python autonome."
+template_name: Ventilation à la demande (CO2)
+template_description: "Salle de réunion : le débit d'air neuf doit garder le CO2 sous 1000 ppm malgré une occupation variable, avec un coût ventilateur + chauffage de l'air neuf. Environnement Python autonome."
 name: Ventilation CO2
-description: Maintenir la qualite d'air (CO2) en consommant le moins possible, en anticipant les reunions.
+description: Maintenir la qualité d'air (CO2) en consommant le moins possible, en anticipant les réunions.
 kind: python
 env:
   entry: env.py:make_env

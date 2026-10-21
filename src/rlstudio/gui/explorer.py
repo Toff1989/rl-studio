@@ -10,7 +10,7 @@ class SimulinkExplorer(QDialog):
 
     def __init__(self, parent, blocks):
         super().__init__(parent)
-        self.setWindowTitle("Explorateur du modele Simulink")
+        self.setWindowTitle("Explorateur du modèle Simulink")
         self.resize(820, 600)
         self.on_observation = self.on_action = None
         self.blocks = [b for b in blocks if b.get("n_out") or b.get("params")]
@@ -19,7 +19,7 @@ class SimulinkExplorer(QDialog):
         self.filter.setPlaceholderText("Filtrer par chemin ou type de bloc...")
         self.filter.textChanged.connect(self._fill)
         self.tree = QTreeWidget()
-        self.tree.setHeaderLabels(["Bloc / element", "Type / valeur"])
+        self.tree.setHeaderLabels(["Bloc / élément", "Type / valeur"])
         self.tree.setColumnWidth(0, 500)
         self.tree.itemSelectionChanged.connect(self._update_buttons)
         self.btn_obs = button("Ajouter comme observation", "primary", self._add_obs)
@@ -32,7 +32,7 @@ class SimulinkExplorer(QDialog):
         lay = QVBoxLayout(self)
         lay.setContentsMargins(20, 20, 20, 20)
         lay.setSpacing(12)
-        lay.addWidget(label("Selectionne une sortie de bloc (signal) ou un parametre numerique de bloc.", "hint"))
+        lay.addWidget(label("Sélectionne une sortie de bloc (signal) ou un paramètre numérique de bloc.", "hint"))
         lay.addWidget(self.filter)
         lay.addWidget(self.tree, 1)
         lay.addLayout(row)
@@ -51,7 +51,7 @@ class SimulinkExplorer(QDialog):
                 it.setData(0, Qt.UserRole, ("signal", b["path"], k))
                 top.addChild(it)
             for p in b.get("params", []):
-                it = QTreeWidgetItem([f"Parametre : {p['name']}", str(p["value"])])
+                it = QTreeWidgetItem([f"Paramètre : {p['name']}", str(p["value"])])
                 it.setData(0, Qt.UserRole, ("param", b["path"], p["name"], p["value"]))
                 top.addChild(it)
             self.tree.addTopLevelItem(top)

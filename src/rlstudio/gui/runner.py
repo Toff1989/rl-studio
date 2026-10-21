@@ -18,7 +18,7 @@ class RuntimeMissing(RuntimeError):
 def _worker_process(settings: Settings, args: list[str], parent) -> QProcess:
     py = runtime.worker_python(settings)
     if py is None:
-        raise RuntimeMissing("Composants de calcul non installes : ouvre Parametres > Composants.")
+        raise RuntimeMissing("Composants de calcul non installés : ouvre Paramètres > Composants.")
     proc = QProcess(parent)
     env = QProcessEnvironment()
     for k, v in runtime.worker_env(settings).items():
@@ -143,8 +143,8 @@ class TrainRunner(QObject):
         elif kind == "progress":
             self.progress.emit(ev.get("stage", ""), float(ev.get("fraction", 0)))
         elif kind == "done":
-            self._final = ("Termine. Resultats : " + ev["run_dir"]) if not ev.get("stopped") else \
-                          "Arrete. Resultats partiels : " + ev["run_dir"]
+            self._final = ("Terminé. Résultats : " + ev["run_dir"]) if not ev.get("stopped") else \
+                          "Arrêté. Résultats partiels : " + ev["run_dir"]
         elif kind == "error":
             self._final = "ERREUR :\n" + ev.get("trace", ev.get("text", ""))
 
@@ -158,10 +158,10 @@ class TrainRunner(QObject):
             self._handle(self._reader.buf)
         if self._killed and self.run_dir and not (self.run_dir / "model.zip").exists():
             shutil.rmtree(self.run_dir, ignore_errors=True)  # run interrompu avant l'enregistrement : rien a garder
-            self.log.emit("Run interrompu avant l'enregistrement du modele : dossier supprime.")
+            self.log.emit("Run interrompu avant l'enregistrement du modèle : dossier supprimé.")
         if self._stopping and self._final is None:
-            self._final = "Arrete."
-        self.finished.emit(self._final or f"ERREUR : le processus de calcul s'est arrete (code {code}).")
+            self._final = "Arrêté."
+        self.finished.emit(self._final or f"ERREUR : le processus de calcul s'est arrêté (code {code}).")
 
 
 class EvalRunner(TrainRunner):
@@ -197,7 +197,7 @@ class EvalRunner(TrainRunner):
                 self.episode_done.emit(ev)
                 return
             if kind == "done":
-                self._final = "Arrete." if ev.get("stopped") else "Termine."
+                self._final = "Arrêté." if ev.get("stopped") else "Terminé."
                 return
         super()._handle(line)
 
@@ -229,7 +229,7 @@ class DistillRunner(TrainRunner):
                 self.progress.emit(ev.get("stage", ""), float(ev.get("fraction", 0)))
                 return
             if ev.get("type") == "done":
-                self._final = "Arrete." if ev.get("stopped") else "Termine."
+                self._final = "Arrêté." if ev.get("stopped") else "Terminé."
                 return
         super()._handle(line)
 

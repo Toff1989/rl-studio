@@ -24,12 +24,12 @@ class EnvTab:
         self.py_params = QPlainTextEdit()
         self.py_params.setObjectName("mono")
         self.py_params.setMinimumHeight(340)
-        entry = Card("Point d'entree", "Fichier et fonction qui construisent l'environnement Gymnasium.")
+        entry = Card("Point d'entrée", "Fichier et fonction qui construisent l'environnement Gymnasium.")
         erow = QHBoxLayout()
         erow.addWidget(self.py_entry, 1)
-        erow.addWidget(button("Ouvrir dans l'editeur", None, self._open_env_file))
+        erow.addWidget(button("Ouvrir dans l'éditeur", None, self._open_env_file))
         entry.body.addLayout(erow)
-        params = Card("Parametres", "YAML passe a make_env(**params).")
+        params = Card("Paramètres", "YAML passé à make_env(**params).")
         params.body.addWidget(self.py_params)
         self.py_page = scroll_page(column(entry, params), 1000)
         self.py_entry.textChanged.connect(self._mark_dirty)
@@ -51,17 +51,17 @@ class EnvTab:
         self.sl_terminate.setPlaceholderText("optionnel, ex. temp > 100")
         self.sl_vars = label("", "hint", wrap=True)
 
-        model = Card("Modele Simulink")
+        model = Card("Modèle Simulink")
         mrow = QHBoxLayout()
         mrow.addWidget(self.sl_model, 1)
         mrow.addWidget(button("Parcourir...", None, self._browse_model))
-        mrow.addWidget(button("Explorer le modele", "primary", self._explore_model))
+        mrow.addWidget(button("Explorer le modèle", "primary", self._explore_model))
         model.body.addLayout(mrow)
         form = QFormLayout()
         form.setHorizontalSpacing(18)
         form.setLabelAlignment(Qt.AlignLeft)
-        form.addRow("Pas de decision", self.sl_step)
-        form.addRow("Duree d'un episode", self.sl_episode)
+        form.addRow("Pas de décision", self.sl_step)
+        form.addRow("Durée d'un épisode", self.sl_episode)
         model.body.addLayout(form)
 
         self.t_actions = SpecTable(ACTION_COLS, {"low": 0.0, "high": 1.0})
@@ -69,25 +69,25 @@ class EnvTab:
         self.t_init = SpecTable(INIT_COLS, {"low": 0.0, "high": 1.0})
         cards = [model]
         for title, hint, table in [
-            ("Actions", "Parametres de blocs ou variables que l'agent commande, avec leurs bornes.", self.t_actions),
-            ("Observations", "Signaux (sorties de blocs) lus par l'agent a chaque pas.", self.t_obs),
-            ("Etat initial aleatoire", "Variables du workspace tirees dans [min, max] a chaque episode (optionnel).", self.t_init),
+            ("Actions", "Paramètres de blocs ou variables que l'agent commande, avec leurs bornes.", self.t_actions),
+            ("Observations", "Signaux (sorties de blocs) lus par l'agent à chaque pas.", self.t_obs),
+            ("État initial aléatoire", "Variables du workspace tirées dans [min, max] à chaque épisode (optionnel).", self.t_init),
         ]:
             card = Card(title, hint)
             card.body.addWidget(table)
             row = QHBoxLayout()
             row.addWidget(button("+  Ajouter", "small", table.add_row))
-            row.addWidget(button("Supprimer la selection", "small", table.remove_selected))
+            row.addWidget(button("Supprimer la sélection", "small", table.remove_selected))
             row.addStretch()
             card.body.addLayout(row)
             table.changed.connect(self._mark_dirty)
             table.changed.connect(self._update_vars_hint)
             cards.append(card)
 
-        reward = Card("Recompense", "Expression evaluee a chaque pas ; les noms des actions et observations sont disponibles.")
-        reward.body.addWidget(label("Recompense", "sectionLabel"))
+        reward = Card("Récompense", "Expression évaluée à chaque pas ; les noms des actions et observations sont disponibles.")
+        reward.body.addWidget(label("Récompense", "sectionLabel"))
         reward.body.addWidget(self.sl_reward)
-        reward.body.addWidget(label("Arret anticipe", "sectionLabel"))
+        reward.body.addWidget(label("Arrêt anticipé", "sectionLabel"))
         reward.body.addWidget(self.sl_terminate)
         reward.body.addWidget(self.sl_vars)
         cards.insert(1, reward)
@@ -95,7 +95,7 @@ class EnvTab:
         self.sl_status = label("", "statusbox", wrap=True)
         self.sl_status.hide()
         check = QHBoxLayout()
-        check.addWidget(button("Verifier la configuration", None, self._check_spec))
+        check.addWidget(button("Vérifier la configuration", None, self._check_spec))
         check.addStretch()
         cards += [check, self.sl_status]
         self.sl_page = scroll_page(column(*cards), 1000)
@@ -124,24 +124,24 @@ class EnvTab:
             os.startfile(path)
 
     def _browse_model(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Modele Simulink", str(self.project.path), "Simulink (*.slx *.mdl)")
+        path, _ = QFileDialog.getOpenFileName(self, "Modèle Simulink", str(self.project.path), "Simulink (*.slx *.mdl)")
         if not path:
             return
         src = os.path.abspath(path)
         if not src.startswith(str(self.project.path)):
             dst = self.project.path / os.path.basename(src)
             shutil.copy2(src, dst)
-            self._log(f"Modele copie dans le projet : {dst}")
+            self._log(f"Modèle copie dans le projet : {dst}")
             src = str(dst)
         self.sl_model.setText(os.path.relpath(src, self.project.path))
 
     def _explore_model(self):
         if not self.sl_model.text().strip():
-            QMessageBox.information(self, "Modele", "Choisis d'abord un modele Simulink.")
+            QMessageBox.information(self, "Modèle", "Choisis d'abord un modèle Simulink.")
             return
         path = self.project.path / self.sl_model.text().strip()
         if not path.exists():
-            QMessageBox.warning(self, "Modele", f"Fichier introuvable : {path}")
+            QMessageBox.warning(self, "Modèle", f"Fichier introuvable : {path}")
             return
         if getattr(self, "_explore_job", None):
             return
@@ -154,7 +154,7 @@ class EnvTab:
         QApplication.restoreOverrideCursor()
         self._explore_job = None
         if res is None:
-            QMessageBox.critical(self, "MATLAB", f"Impossible d'inspecter le modele :\n{err}")
+            QMessageBox.critical(self, "MATLAB", f"Impossible d'inspecter le modèle :\n{err}")
             return
         dlg = SimulinkExplorer(self, res["blocks"])
         dlg.on_observation = self.t_obs.add_row

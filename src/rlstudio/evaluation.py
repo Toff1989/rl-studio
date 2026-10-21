@@ -1,4 +1,4 @@
-"""Evaluation d'un run entraine (ou d'un modele extrait) : episodes rejoues pas a pas avec evenements en direct."""
+"""Evaluation d'un run entraîné (ou d'un modele extrait) : episodes rejoues pas à pas avec evenements en direct."""
 import time
 
 import numpy as np
@@ -8,10 +8,10 @@ def policy_choices(run_dir):
     """[(id, libelle)] : l'agent entraine, puis chaque modele mathematique extrait de ce run."""
     from .distill.export import load_report
 
-    out = [("agent", "Agent entraine")]
+    out = [("agent", "Agent entraîné")]
     rep = load_report(run_dir)
     for c in (rep or {}).get("candidates", []):
-        out.append((f"distill:{c['id']}", f"Modele extrait : {c['label']}"))
+        out.append((f"distill:{c['id']}", f"Modèle extrait : {c['label']}"))
     return out
 
 
@@ -65,7 +65,7 @@ def run_evaluation(project, run_dir, policy_id="agent", episodes=5, seed=1000, d
         summary = {"episodes": len(returns), "return_mean": float(np.mean(returns)) if returns else 0.0,
                    "return_std": float(np.std(returns)) if returns else 0.0,
                    "length_mean": float(np.mean(lengths)) if lengths else 0.0}
-        log(f"Evaluation : {summary['episodes']} episode(s), retour moyen {summary['return_mean']:.3f} +/- {summary['return_std']:.3f}")
+        log(f"Évaluation : {summary['episodes']} episode(s), retour moyen {summary['return_mean']:.3f} +/- {summary['return_std']:.3f}")
         return summary
     finally:
         if own:

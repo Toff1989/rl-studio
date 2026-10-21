@@ -52,7 +52,7 @@ def _run_until_finished(qapp, r, action, timeout=10):
 def test_stop_before_learning_kills_immediately(qapp, monkeypatch, tmp_path):
     r = _runner(monkeypatch, tmp_path, "import time; print('{\"type\": \"log\", \"text\": \"phase de reference\"}'); time.sleep(60)")
     done, elapsed = _run_until_finished(qapp, r, lambda: r.stop())
-    assert done == ["Arrete."]  # pas « ERREUR : Crashed »
+    assert done == ["Arrêté."]  # pas « ERREUR : Crashed »
     assert elapsed < 2.0
 
 
@@ -64,7 +64,7 @@ def test_stop_during_learning_lets_the_model_save(qapp, monkeypatch, tmp_path):
     r = _runner(monkeypatch, tmp_path, script)
     r.log.connect(lambda m: None)
     done, elapsed = _run_until_finished(qapp, r, lambda: r.stop())
-    assert r._graceful and done and done[0].startswith("Arrete. Resultats partiels")
+    assert r._graceful and done and done[0].startswith("Arrêté. Résultats partiels")
     assert elapsed < 2.0
 
 
@@ -75,4 +75,4 @@ def test_unresponsive_learning_worker_is_killed_after_grace(qapp, monkeypatch, t
     r = _runner(monkeypatch, tmp_path, script)
     r.GRACE_MS = 400
     done, elapsed = _run_until_finished(qapp, r, lambda: r.stop())
-    assert done == ["Arrete."] and 0.3 < elapsed < 3.0
+    assert done == ["Arrêté."] and 0.3 < elapsed < 3.0

@@ -15,7 +15,7 @@ Spec attendue (cle `env` du projet) :
   reward: "-(temp - 20)**2"   # variables : observations, actions, t, dt, step
   terminate: "temp > 100"     # optionnel
 
-Les signaux observes sont journalises en memoire (le .slx n'est pas modifie).
+Les signaux observes sont journalises en memoire (le .slx n'est pas modifié).
 L'etat du modele est conserve d'un pas a l'autre cote MATLAB (matlab/rlstudio_step.m).
 """
 import json

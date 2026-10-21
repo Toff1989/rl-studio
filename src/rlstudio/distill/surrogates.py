@@ -73,7 +73,7 @@ class Surrogate:
     """Base : un modele simple de la politique."""
 
     kind = "surrogate"
-    stateful = False  # vrai si la sortie depend de l'historique (integrateur du PID)
+    stateful = False  # vrai si la sortie dépend de l'historique (integrateur du PID)
 
     def __init__(self, obs_names, act_names, low, high, label=""):
         self.obs_names, self.act_names = [str(n) for n in obs_names], [str(n) for n in act_names]
@@ -121,7 +121,7 @@ class Surrogate:
         raise NotImplementedError
 
     def _header(self, name):
-        return f"{self.title()} - extrait par RL Studio. Entrees : {', '.join(self.obs_names)} ; sorties : {', '.join(self.act_names)}."
+        return f"{self.title()} - extrait par RL Studio. Entrées : {', '.join(self.obs_names)} ; sorties : {', '.join(self.act_names)}."
 
     def to_python(self, name="policy") -> str:
         v = clean_names(self.obs_names, PY_RESERVED)
@@ -168,7 +168,7 @@ class LinearSurrogate(Surrogate):
     kind = "linear"
 
     def __init__(self, obs_names, act_names, low, high, W, b, integ_idx=(), Wi=None, dt=1.0, label=""):
-        super().__init__(obs_names, act_names, low, high, label or ("PID (retour d'etat + integrale)" if len(integ_idx) else "Retour d'etat lineaire"))
+        super().__init__(obs_names, act_names, low, high, label or ("PID (retour d'état + intégrale)" if len(integ_idx) else "Retour d'état linéaire"))
         self.W, self.b = np.asarray(W, float), np.asarray(b, float).ravel()
         self.integ_idx = [int(i) for i in integ_idx]
         self.Wi = np.zeros((len(self.b), 0)) if Wi is None else np.asarray(Wi, float).reshape(len(self.b), -1)
@@ -199,7 +199,7 @@ class LinearSurrogate(Surrogate):
         for k, a in enumerate(self.act_names):
             terms = [f"{self.W[k, i]:+.4g}*{n}" for i, n in enumerate(self.obs_names) if abs(self.W[k, i]) > 1e-12]
             terms += [f"{self.Wi[k, j]:+.4g}*int({self.obs_names[i]})dt" for j, i in enumerate(self.integ_idx)]
-            eqs.append(f"{a} = {self.b[k]:.4g} " + " ".join(terms) + f"   (borne a [{self.low[k]:.4g}, {self.high[k]:.4g}])")
+            eqs.append(f"{a} = {self.b[k]:.4g} " + " ".join(terms) + f"   (borne à [{self.low[k]:.4g}, {self.high[k]:.4g}])")
         return eqs
 
     def code(self, lang, v):
@@ -216,8 +216,8 @@ class LinearSurrogate(Surrogate):
         _, body = self.code("py", v)
         k = len(self.integ_idx)
         lines = [f'"""{self._header(name)}"""', "import numpy as np", "", f"LOW = {vec_py(self.low)}", f"HIGH = {vec_py(self.high)}",
-                 f"DT = {num(self.dt)}   # pas de temps de l'integrale (secondes ou pas de decision)", "", "",
-                 "class Policy:", f"    \"\"\"Politique a etat (integrale) : appeler reset() au debut de chaque episode.\"\"\"", "",
+                 f"DT = {num(self.dt)}   # pas de temps de l'intégrale (secondes ou pas de décision)", "", "",
+                 "class Policy:", f"    \"\"\"Politique à état (intégrale) : appeler reset() au début de chaque épisode.\"\"\"", "",
                  "    def __init__(self):", "        self.reset()", "", "    def reset(self):", f"        self.integ = np.zeros({k})", "",
                  "    def __call__(self, obs):"]
         lines += [f"        {n} = float(obs[{i}])" for i, n in enumerate(v)]
@@ -236,7 +236,7 @@ class LinearSurrogate(Surrogate):
         _, body = self.code("m", v)
         k, m = len(self.integ_idx), len(self.act_names)
         upd = "; ".join(v[i] for i in self.integ_idx)
-        lines = [f"function u = {name}(obs)", f"% {self._header(name)}", "% Politique a etat (integrale) : `clear " + name + "` la reinitialise.", "%#codegen",
+        lines = [f"function u = {name}(obs)", f"% {self._header(name)}", "% Politique à état (intégrale) : `clear " + name + "` la réinitialise.", "%#codegen",
                  "persistent integ;", f"DT = {num(self.dt)};", f"if isempty(integ), integ = zeros({k}, 1); end"]
         lines += [f"{n} = obs({i + 1});" for i, n in enumerate(v)]
         lines += [f"integ = integ + [{upd}] * DT;", f"u = zeros({m}, 1);"] + body
@@ -250,7 +250,7 @@ class LinearSurrogate(Surrogate):
 
 
 def fit_linear(data, ridge=1e-8, integrators=(), dt=1.0, label="") -> LinearSurrogate:
-    """Moindres carres (ridge leger) ; `integrators` : noms d'observations a integrer (action integrale)."""
+    """Moindres carres (ridge leger) ; `integrators` : noms d'observations à intégrer (action integrale)."""
     names = data.obs_names
     idx = [names.index(n) for n in integrators]
     feats = []
@@ -301,7 +301,7 @@ class PolynomialSurrogate(Surrogate):
     kind = "polynomial"
 
     def __init__(self, obs_names, act_names, low, high, degree, mu, sd, E, C, b, label=""):
-        super().__init__(obs_names, act_names, low, high, label or f"Polynome de degre {int(degree)}")
+        super().__init__(obs_names, act_names, low, high, label or f"Polynôme de degré {int(degree)}")
         self.degree = int(degree)
         self.mu, self.sd = np.asarray(mu, float).ravel(), np.asarray(sd, float).ravel()
         self.E = np.asarray(E, int).reshape(-1, len(self.mu))
@@ -335,7 +335,7 @@ class PolynomialSurrogate(Surrogate):
             terms = [f"{self.C[k, t]:+.4g}*{self._term(t, zn, 'py')}" for t in sorted(order)]
             more = int(np.count_nonzero(np.abs(self.C[k]) > 1e-12)) - len(order)
             eqs.append(f"{a} = {self.b[k]:.4g} " + " ".join(terms) + (f" ... (+{more} termes)" if more > 0 else "")
-                       + f"   (borne a [{self.low[k]:.4g}, {self.high[k]:.4g}])")
+                       + f"   (borne à [{self.low[k]:.4g}, {self.high[k]:.4g}])")
         return head + eqs
 
     def title(self):
@@ -384,7 +384,7 @@ class TreeSurrogate(Surrogate):
     kind = "tree"
 
     def __init__(self, obs_names, act_names, low, high, feat, thr, left, right, value, label=""):
-        super().__init__(obs_names, act_names, low, high, label or "Arbre de decision")
+        super().__init__(obs_names, act_names, low, high, label or "Arbre de décision")
         self.feat, self.thr = np.asarray(feat, int), np.asarray(thr, float)
         self.left, self.right = np.asarray(left, int), np.asarray(right, int)
         self.value = np.asarray(value, float).reshape(len(self.feat), -1)
@@ -541,7 +541,7 @@ class TableSurrogate(Surrogate):
 
     def equations(self):
         names = [self.obs_names[i] for i in self.dims]
-        out = [f"actions = interpolation lineaire d'une table sur ({', '.join(names)}) ; les autres entrees sont ignorees"]
+        out = [f"actions = interpolation linéaire d'une table sur ({', '.join(names)}) ; les autres entrées sont ignorées"]
         for n, g in zip(names, self.grids):
             out.append(f"  {n} : {len(g)} points de {g[0]:.4g} a {g[-1]:.4g}")
         if len(self.dims) == 1:
@@ -669,7 +669,7 @@ class SymbolicSurrogate(Surrogate):
 
     def __init__(self, obs_names, act_names, low, high, models, label=""):
         """models : par action, {"intercept": b, "terms": [(coef, kind, i, j), ...]}"""
-        super().__init__(obs_names, act_names, low, high, label or "Equation symbolique")
+        super().__init__(obs_names, act_names, low, high, label or "Équation symbolique")
         self.models = [{"intercept": float(m["intercept"]), "terms": [(float(c), str(k), int(i), int(j)) for c, k, i, j in m["terms"]]} for m in models]
 
     @property
@@ -689,7 +689,7 @@ class SymbolicSurrogate(Surrogate):
         return " + ".join(parts).replace("+ -", "- ")
 
     def equations(self):
-        return [f"{a} = {self._expr(k, self.obs_names, 'py', digits=True)}   (borne a [{self.low[k]:.4g}, {self.high[k]:.4g}])" for k, a in enumerate(self.act_names)]
+        return [f"{a} = {self._expr(k, self.obs_names, 'py', digits=True)}   (borne à [{self.low[k]:.4g}, {self.high[k]:.4g}])" for k, a in enumerate(self.act_names)]
 
     def code(self, lang, v):
         py = lang == "py"
@@ -744,7 +744,7 @@ def fit_symbolic(data, term_counts=(3, 6, 12), label="") -> dict[int, SymbolicSu
         for history in per_action:
             size = max((s for s in history if s <= k), default=None)
             models.append(history[size] if size else {"intercept": 0.0, "terms": []})
-        out[k] = SymbolicSurrogate(data.obs_names, data.act_names, data.low, data.high, models, label=(label or "Equation symbolique") + f" ({k} termes max)")
+        out[k] = SymbolicSurrogate(data.obs_names, data.act_names, data.low, data.high, models, label=(label or "Équation symbolique") + f" ({k} termes max)")
     return out
 
 
@@ -758,7 +758,7 @@ class NeuralSurrogate(Surrogate):
 
     def __init__(self, obs_names, act_names, low, high, layers, squash, label=""):
         """layers : [(W (out,in), b (out,), activation 'relu'|'tanh'|'identity')] ; squash : sortie = low + 0.5*(tanh(z)+1)*(high-low)"""
-        super().__init__(obs_names, act_names, low, high, label or "Reseau de neurones (exact)")
+        super().__init__(obs_names, act_names, low, high, label or "Réseau de neurones (exact)")
         self.layers = [(np.asarray(W, float), np.asarray(b, float), str(act)) for W, b, act in layers]
         self.squash = bool(squash)
 
@@ -780,9 +780,9 @@ class NeuralSurrogate(Surrogate):
     def equations(self):
         sizes = [self.layers[0][0].shape[1]] + [W.shape[0] for W, _, _ in self.layers]
         acts = [a for _, _, a in self.layers]
-        return [f"reseau {' -> '.join(map(str, sizes))} ({self.complexity} parametres), activations : {', '.join(acts)}",
-                ("sortie = low + 0.5*(tanh(z)+1)*(high-low)" if self.squash else "sortie = z, bornee a [low, high]"),
-                "(formule explicite dans les fichiers exportes : politique opaque, a distiller pour comprendre)"]
+        return [f"reseau {' -> '.join(map(str, sizes))} ({self.complexity} paramètres), activations : {', '.join(acts)}",
+                ("sortie = low + 0.5*(tanh(z)+1)*(high-low)" if self.squash else "sortie = z, bornée à [low, high]"),
+                "(formule explicite dans les fichiers exportés : politique opaque, à distiller pour comprendre)"]
 
     def code(self, lang, v):
         py = lang == "py"
@@ -832,4 +832,4 @@ def surrogate_from_dict(d: dict) -> Surrogate:
         return SymbolicSurrogate(*common, d["models"], label=label)
     if kind == "neural":
         return NeuralSurrogate(*common, [(W, b, a) for W, b, a in d["layers"]], d["squash"], label=label)
-    raise ValueError(f"type de modele inconnu : {kind!r}")
+    raise ValueError(f"type de modèle inconnu : {kind!r}")

@@ -1,6 +1,6 @@
 """Modele entrees -> sorties en REGIME PERMANENT (carte statique y = f(u)), sans dynamique.
 
-Plan d'experience (hypercube latin sur les entrees) -> chaque point est simule jusqu'a convergence -> sortie stabilisee relevee
+Plan d'expérience (hypercube latin sur les entrees) -> chaque point est simulé jusqu'a convergence -> sortie stabilisee relevee
 -> ajustement (lineaire, polynome, equation parcimonieuse, reseau) -> validation sur des points jamais vus -> rapport et code exporte.
 """
 from __future__ import annotations
@@ -64,7 +64,7 @@ def run_steady(project, options: SteadyOptions | None = None, log=print, progres
     opts = options or SteadyOptions()
     unknown = [m for m in opts.methods if m not in METHODS]
     if unknown:
-        raise ValueError(f"methodes inconnues : {unknown} (disponibles : {METHODS})")
+        raise ValueError(f"méthodes inconnues : {unknown} (disponibles : {METHODS})")
     own = env is None
     env = env or make_env(project)
     try:
@@ -83,21 +83,21 @@ def steady_env(env, opts, name="env", out_dir=None, log=print, progress=None, sh
     names_a = list(getattr(env, "action_names", None) or [f"u{i}" for i in range(len(env_low))])
     unknown = [n for n in list(opts.fixed) + list(opts.ranges) if n not in names_a]
     if unknown:
-        raise ValueError(f"entrees inconnues : {unknown} (actions disponibles : {names_a})")
+        raise ValueError(f"entrées inconnues : {unknown} (actions disponibles : {names_a})")
     swept = [i for i, n in enumerate(names_a) if n not in opts.fixed]
     if not swept:
-        raise ValueError("Toutes les entrees sont fixees : il n'y a rien a balayer.")
+        raise ValueError("Toutes les entrées sont fixées : il n'y a rien à balayer.")
     low, high = env_low[swept].copy(), env_high[swept].copy()
     for j, i in enumerate(swept):
         if names_a[i] in opts.ranges:
             a, b = (float(v) for v in opts.ranges[names_a[i]])
             if not a < b:
-                raise ValueError(f"plage de {names_a[i]} : min doit etre < max ({a} >= {b}).")
+                raise ValueError(f"plage de {names_a[i]} : min doit être < max ({a} >= {b}).")
             low[j], high[j] = max(a, env_low[i]), min(b, env_high[i])
             if not low[j] < high[j]:
                 raise ValueError(f"plage de {names_a[i]} hors des bornes de l'action [{env_low[i]:g}, {env_high[i]:g}].")
             if (a, b) != (low[j], high[j]):
-                log(f"  plage de {names_a[i]} ramenee aux bornes de l'action : [{low[j]:g}, {high[j]:g}]")
+                log(f"  plage de {names_a[i]} ramenée aux bornes de l'action : [{low[j]:g}, {high[j]:g}]")
     base = (env_low + env_high) / 2.0
     for n, v in opts.fixed.items():
         i = names_a.index(n)
@@ -110,7 +110,7 @@ def steady_env(env, opts, name="env", out_dir=None, log=print, progress=None, sh
         progress(stage, min(0.999, done[0] / total))
 
     kw = dict(rtol=opts.rtol, atol=opts.atol, window=opts.window, max_steps=opts.max_settle_steps, scenario=opts.scenario, should_stop=should_stop, swept=swept, base=base)
-    log(f"Regime permanent : {opts.samples} point(s) d'apprentissage + {opts.val_samples} de validation (hypercube latin sur {len(low)} entree(s) : {', '.join(names_a[i] for i in swept)}) ...")
+    log(f"Régime permanent : {opts.samples} point(s) d'apprentissage + {opts.val_samples} de validation (hypercube latin sur {len(low)} entree(s) : {', '.join(names_a[i] for i in swept)}) ...")
     train = collect.steady_sweep(env, collect.latin_hypercube(rng, opts.samples, low, high, opts.extreme), 100 + opts.seed,
                                  on_point=lambda k, n: bump(f"Points d'apprentissage : {k}/{n}"), **kw)
     val = collect.steady_sweep(env, rng.uniform(low, high, (opts.val_samples, len(low))), 900_000 + opts.seed,
@@ -122,9 +122,9 @@ def steady_env(env, opts, name="env", out_dir=None, log=print, progress=None, sh
         train.select_outputs(opts.outputs)
         val.select_outputs(opts.outputs)
     dropped = train.dropped + val.dropped
-    log(f"  {len(train)} + {len(val)} points stabilises (en moyenne {np.mean(train.steps + val.steps):.1f} pas), {dropped} ecarte(s) faute de convergence")
+    log(f"  {len(train)} + {len(val)} points stabilisés (en moyenne {np.mean(train.steps + val.steps):.1f} pas), {dropped} ecarte(s) faute de convergence")
     if len(train) < 5 or len(val) < 2:
-        raise ValueError("Trop peu de points stabilises : augmenter la duree max (`max_settle_steps`) ou assouplir `rtol` / `atol`.")
+        raise ValueError("Trop peu de points stabilisés : augmenter la durée max (`max_settle_steps`) ou assouplir `rtol` / `atol`.")
 
     fits = []
     for m in opts.methods:
@@ -154,14 +154,14 @@ def steady_env(env, opts, name="env", out_dir=None, log=print, progress=None, sh
     recommended = (min(ok, key=lambda c: c["complexity"]) if ok else max(candidates, key=lambda c: c["r2"]))["id"]
     notes = []
     if not ok:
-        notes.append(f"Aucun modele n'atteint R2 = {1 - opts.margin:.0%} : augmenter le nombre de points, ou la complexite (degre, reseau).")
+        notes.append(f"Aucun modèle n'atteint R2 = {1 - opts.margin:.0%} : augmenter le nombre de points, ou la complexité (degré, réseau).")
     if dropped > 0.1 * (opts.samples + opts.val_samples):
-        notes.append(f"{dropped} point(s) n'ont pas converge (instabilite, oscillation entretenue ou duree trop courte) : le modele ne les represente pas.")
+        notes.append(f"{dropped} point(s) n'ont pas convergé (instabilité, oscillation entretenue ou durée trop courte) : le modèle ne les représente pas.")
     if max(train.steps) >= (opts.max_settle_steps or 10 ** 9) * 0.9:
-        notes.append("Certains points convergent a la limite de duree : augmenter `max_settle_steps` pour eviter des sorties non stabilisees.")
-    notes.append("Le modele n'est valable que dans le domaine des entrees balayees (les polynomes et le reseau extrapolent mal au-dela).")
-    notes.append("Si plusieurs regimes permanents existent pour une meme entree (hysteresis, bistabilite), la sortie depend de l'histoire : "
-                 "le modele statique en donne une moyenne. Ajouter l'etat en cause comme entree.")
+        notes.append("Certains points convergent à la limite de durée : augmenter `max_settle_steps` pour éviter des sorties non stabilisées.")
+    notes.append("Le modèle n'est valable que dans le domaine des entrées balayées (les polynômes et le réseau extrapolent mal au-dela).")
+    notes.append("Si plusieurs régimes permanents existent pour une même entrée (hystérésis, bistabilité), la sortie dépend de l'histoire : "
+                 "le modèle statique en donne une moyenne. Ajouter l'état en cause comme entrée.")
     report = {"mode": "steady", "version": __version__, "created": time.strftime("%Y-%m-%d %H:%M"), "project": name, "out_names": train.obs_names,
               "in_names": train.act_names, "options": asdict(opts), "n_train": len(train), "n_val": len(val), "dropped": dropped,
               "mean_settle_steps": float(np.mean(train.steps)), "candidates": candidates, "recommended": recommended, "notes": notes,
@@ -170,5 +170,5 @@ def steady_env(env, opts, name="env", out_dir=None, log=print, progress=None, sh
         report["dir"] = str(out_dir)
         write_report(report, out_dir)
         log(f"Rapport : {out_dir / 'report.json'}")
-    progress("Termine", 1.0)
+    progress("Terminé", 1.0)
     return report

@@ -50,68 +50,68 @@ def unique_names(names):
 
 
 def validate_conversion(spec: dict) -> list[str]:
-    """Liste de problemes de la specification (vide si OK) ; utilisee par la fenetre avant de lancer la conversion."""
+    """Liste de problemes de la spécification (vide si OK) ; utilisee par la fenetre avant de lancer la conversion."""
     errs = []
     if not str(spec.get("project_name", "")).strip():
         errs.append("Donne un nom au projet.")
     if not spec.get("model_path"):
-        errs.append("Aucun modele Simulink choisi.")
+        errs.append("Aucun modèle Simulink choisi.")
     acts, obs = spec.get("actions") or [], spec.get("observations") or []
     if not acts:
-        errs.append("Il faut au moins une action (une entree ou un parametre pilote par l'agent).")
+        errs.append("Il faut au moins une action (une entrée ou un paramètre pilote par l'agent).")
     if not obs:
         errs.append("Il faut au moins une observation.")
     for a in acts:
         if not a.get("name"):
             errs.append("Une action n'a pas de nom.")
         if a.get("kind") == "param" and not (a.get("path") and a.get("param")):
-            errs.append(f"Action {a.get('name')!r} : bloc et parametre requis.")
+            errs.append(f"Action {a.get('name')!r} : bloc et paramètre requis.")
         try:
             if not float(a.get("low", 0)) < float(a.get("high", 1)):
-                errs.append(f"Action {a.get('name')!r} : le minimum doit etre inferieur au maximum.")
+                errs.append(f"Action {a.get('name')!r} : le minimum doit être inférieur au maximum.")
         except (TypeError, ValueError):
             errs.append(f"Action {a.get('name')!r} : minimum / maximum invalides.")
     names = [x.get("name") for x in acts + obs]
     if len(set(names)) != len(names):
-        errs.append("Les noms des actions et observations doivent etre uniques.")
+        errs.append("Les noms des actions et observations doivent être uniques.")
     for x in acts + obs:
         n = x.get("name") or ""
         if n and sanitize_name(n) != n:
-            errs.append(f"Nom {n!r} invalide (lettres, chiffres et _ uniquement, sans mot reserve).")
+            errs.append(f"Nom {n!r} invalide (lettres, chiffres et _ uniquement, sans mot réservé).")
     for i in spec.get("initial") or []:
         try:
             if float(i["low"]) > float(i["high"]):
-                errs.append(f"Variable initiale {i.get('variable')!r} : minimum superieur au maximum.")
+                errs.append(f"Variable initiale {i.get('variable')!r} : minimum supérieur au maximum.")
         except (KeyError, TypeError, ValueError):
             errs.append(f"Variable initiale {i.get('variable')!r} : bornes invalides.")
     try:
         if float(spec.get("step_s", 0)) <= 0 or float(spec.get("episode_s", 0)) <= 0:
-            errs.append("Le pas de decision et la duree de l'episode doivent etre > 0.")
+            errs.append("Le pas de décision et la durée de l'épisode doivent être > 0.")
         elif float(spec["episode_s"]) < float(spec["step_s"]):
-            errs.append("L'episode doit durer au moins un pas de decision.")
+            errs.append("L'épisode doit durer au moins un pas de décision.")
     except (TypeError, ValueError):
-        errs.append("Pas de decision / duree d'episode invalides.")
+        errs.append("Pas de décision / durée d'épisode invalides.")
     if spec.get("solver") == "fixed":
         try:
             if float(spec.get("solver_step", 0)) <= 0:
-                errs.append("Le pas du solveur doit etre > 0.")
+                errs.append("Le pas du solveur doit être > 0.")
             elif float(spec["step_s"]) < float(spec["solver_step"]):
-                errs.append("Le pas du solveur doit etre inferieur ou egal au pas de decision.")
+                errs.append("Le pas du solveur doit être inférieur ou égal au pas de décision.")
         except (TypeError, ValueError):
             errs.append("Pas du solveur invalide.")
     if not spec.get("reward"):
-        errs.append("Ecris une expression de recompense.")
+        errs.append("Écris une expression de récompense.")
     else:
         for key in ("reward", "terminate"):
             if spec.get(key):
                 err = expressions.check_expression(spec[key], [n for n in names if n])
                 if err:
-                    errs.append(f"{'Recompense' if key == 'reward' else 'Arret anticipe'} : {err}")
+                    errs.append(f"{'Récompense' if key == 'reward' else 'Arrêt anticipé'} : {err}")
     return errs
 
 
 def matlab_spec(spec: dict) -> dict:
-    """Partie de la specification lue par matlab/rlstudio_convert.m."""
+    """Partie de la spécification lue par matlab/rlstudio_convert.m."""
     return {
         "inports": [{"path": a["path"], "name": a["name"], "default": a.get("default", 0.0)}
                     for a in spec.get("actions") or [] if a.get("kind") == "inport"],
@@ -126,7 +126,7 @@ def matlab_spec(spec: dict) -> dict:
 
 
 def build_env_cfg(spec: dict, result: dict, model_file: str) -> dict:
-    """Cle `env` du project.yaml, a partir de la specification et de la reponse de rlstudio_convert."""
+    """Cle `env` du project.yaml, a partir de la spécification et de la reponse de rlstudio_convert."""
     converted = {a["name"]: a for a in result.get("actions") or []}
     actions = []
     for a in spec["actions"]:
@@ -163,7 +163,7 @@ def write_project(project_dir, spec: dict, result: dict) -> dict:
     model_file = f"{result['model']}.slx"
     cfg = {
         "name": spec["project_name"].strip(),
-        "description": f"Modele Simulink converti ({Path(spec['model_path']).name}) : copie adaptee a RL Studio.",
+        "description": f"Modèle Simulink converti ({Path(spec['model_path']).name}) : copie adaptée a RL Studio.",
         "kind": "simulink",
         "created": time.strftime("%Y-%m-%d %H:%M"),
         "env": build_env_cfg(spec, result, model_file),

@@ -23,7 +23,7 @@ def status(settings: Settings) -> dict:
     py = worker_python(settings)
     if py is None:
         return {"ok": False, "python": None, "kind": "missing",
-                "message": "Composants de calcul non installes (Parametres > Composants)."}
+                "message": "Composants de calcul non installés (Paramètres > Composants)."}
     kind = "manuel" if settings.get("python_runtime") else ("installe" if components.runtime_python() else "developpement")
     return {"ok": True, "python": str(py), "kind": kind, "message": f"Python de calcul : {py}"}
 
@@ -32,7 +32,7 @@ def worker_env(settings: Settings) -> dict:
     env = dict(os.environ)
     env["PYTHONPATH"] = os.pathsep.join(filter(None, [str(LIB_DIR), env.get("PYTHONPATH", "")]))
     env["RLSTUDIO_RESOURCES"] = str(RESOURCE_DIR)
-    env["RLSTUDIO_LIB"] = str(LIB_DIR)  # le Python embarque ignore PYTHONPATH (voir components.SITECUSTOMIZE)
+    env["RLSTUDIO_LIB"] = str(LIB_DIR)  # le Python embarqué ignore PYTHONPATH (voir components.SITECUSTOMIZE)
     env["RLSTUDIO_HOME"] = str(USER_DIR)
     env["PYTHONIOENCODING"] = "utf-8"
     env["PYTHONUNBUFFERED"] = "1"

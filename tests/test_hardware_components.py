@@ -139,6 +139,6 @@ def test_torch_is_installed_before_base_requirements(tmp_path):
     lines = []
     components.provision(plan, tmp_path / "rt", lines.append, dry_run=True)
     titles = [line for line in lines if line.startswith("== ")]
-    assert titles.index("== PyTorch cu130") < titles.index("== Bibliotheques de base")
+    assert titles.index("== PyTorch cu130") < titles.index("== Bibliothèques de base")
     cmd = next(line for line in lines if "whl/cu130" in line)
     assert "--upgrade" in cmd

@@ -56,13 +56,13 @@ class TrainTab:
         self.p_act.restyle()
 
     def _tab_train(self):
-        self.btn_start = button("▶  Demarrer", "primary", self._start)
-        self.btn_stop = button("■  Arreter", "danger", self._stop)
+        self.btn_start = button("▶  Démarrer", "primary", self._start)
+        self.btn_stop = button("■  Arrêter", "danger", self._stop)
         self.btn_stop.setEnabled(False)
         self.progress = QProgressBar()
         self.progress.setRange(0, 100)
         self.progress.setTextVisible(False)
-        self.status = label("Pret.", "muted")
+        self.status = label("Prêt.", "muted")
         bar = QHBoxLayout()
         bar.setSpacing(10)
         bar.addWidget(self.btn_start)
@@ -71,27 +71,27 @@ class TrainTab:
         bar.addWidget(self.progress, 1)
         bar.addWidget(self.status)
 
-        self.m_eps, self.m_steps = Kpi("Episodes"), Kpi("Pas")
-        self.m_last, self.m_best, self.m_base = Kpi("Derniere recompense"), Kpi("Meilleure"), Kpi("Reference")
+        self.m_eps, self.m_steps = Kpi("Épisodes"), Kpi("Pas")
+        self.m_last, self.m_best, self.m_base = Kpi("Dernière récompense"), Kpi("Meilleure"), Kpi("Référence")
         kpis = QHBoxLayout()
         kpis.setSpacing(12)
         for k in (self.m_eps, self.m_steps, self.m_last, self.m_best, self.m_base):
             kpis.addWidget(k, 1)
 
-        self.p_reward = self._plot("Recompense par episode")
+        self.p_reward = self._plot("Récompense par épisode")
         self.c_reward = self.p_reward.plot(pen=pg.mkPen(C["accent"], width=1), symbol="o", symbolSize=4,
                                            symbolBrush=C["accent"], symbolPen=None)
         self.c_smooth = self.p_reward.plot(pen=pg.mkPen(C["warning"], width=3))
         self.base_line = pg.InfiniteLine(angle=0, pen=pg.mkPen(C["danger"], width=1.5, style=Qt.DashLine))
         self.p_reward.addItem(self.base_line)
         self.base_line.hide()
-        self.p_obs = SeriesPlot("Observations (episode en cours)")
-        self.p_act = SeriesPlot("Actions (episode en cours)")
+        self.p_obs = SeriesPlot("Observations (épisode en cours)")
+        self.p_act = SeriesPlot("Actions (épisode en cours)")
         self.p_obs.setMinimumHeight(260)
         self.p_act.setMinimumHeight(260)
-        self.chk_norm = QCheckBox("Normaliser les courbes (comparer des signaux d'echelles differentes)")
+        self.chk_norm = QCheckBox("Normaliser les courbes (comparer des signaux d'échelles différentes)")
         self.chk_norm.toggled.connect(lambda f: (self.p_obs.set_normalized(f), self.p_act.set_normalized(f)))
-        self.p_rew_step = self._plot("Recompense par pas (episode en cours)")
+        self.p_rew_step = self._plot("Récompense par pas (épisode en cours)")
         self.c_rew_step = self.p_rew_step.plot(pen=pg.mkPen(C["success"], width=2))
         self._style_plots()
         grid = QGridLayout()
@@ -106,8 +106,8 @@ class TrainTab:
         self.logbox.setReadOnly(True)
         self.logbox.setLineWrapMode(QPlainTextEdit.WidgetWidth)
         self.logbox.setMaximumBlockCount(LOG_MAX_LINES)  # un journal qui grossit sans limite ralentit tout l'affichage
-        self.logbox.setPlaceholderText("Le journal de l'entrainement s'affiche ici : demarrage de MATLAB, "
-                                       "evaluation de reference, episodes, vitesse et temps restant.")
+        self.logbox.setPlaceholderText("Le journal de l'entraînement s'affiche ici : démarrage de MATLAB, "
+                                       "évaluation de référence, épisodes, vitesse et temps restant.")
         side = Card("Journal")
         side.setFixedWidth(380)
         side.body.addWidget(self.logbox, 1)
@@ -133,7 +133,7 @@ class TrainTab:
         self.c_smooth.setData([], [])
         self.base_line.hide()
         self.progress.setValue(0)
-        self.status.setText("Pret.")
+        self.status.setText("Prêt.")
         for k in (self.m_eps, self.m_steps, self.m_last, self.m_best, self.m_base):
             k.set("-")
         self._reset_trace()
@@ -163,7 +163,7 @@ class TrainTab:
         self._total_steps = int(self.project.cfg["algo"]["total_timesteps"])
         self.progress.setRange(0, self._total_steps)
         self._t_run, self._t_learn, self._steps_learn0, self._phase_base = time.monotonic(), None, 0, False
-        self._log("Lancement de l'entrainement...")
+        self._log("Lancement de l'entraînement...")
         self.worker = TrainRunner(self.project, self.settings, self)
         self.worker.episode.connect(self._on_episode)
         self.worker.progress.connect(self._on_progress)
@@ -181,19 +181,19 @@ class TrainTab:
         self.btn_start.setEnabled(False)
         self.btn_stop.setEnabled(True)
         self.plist.setEnabled(False)
-        self.status.setText("Demarrage de l'environnement...")
+        self.status.setText("Démarrage de l'environnement...")
 
     def _on_progress(self, stage, fraction):
         if stage == "baseline":
             self._phase_base = True
             self.progress.setRange(0, 1000)
             self.progress.setValue(int(fraction * 1000))
-            self.status.setText(f"Evaluation de reference : {fraction * 100:.0f} %")
+            self.status.setText(f"Évaluation de référence : {fraction * 100:.0f} %")
 
     def _stop(self):
         if self.worker:
             self.worker.stop()
-            self.status.setText("Arret...")
+            self.status.setText("Arrêt...")
 
     def _on_meta(self, obs_names, act_names):
         self.p_obs.set_names(obs_names)
@@ -203,7 +203,7 @@ class TrainTab:
         self.base_line.setValue(mean)
         self.base_line.show()
         self.m_base.set(f"{mean:.2f}")
-        self._log(f"Reference tracee en rouge : {lbl}")
+        self._log(f"Référence tracée en rouge : {lbl}")
 
     def _on_episode(self, n, reward, length, steps):
         self.xs.append(n)
@@ -224,13 +224,13 @@ class TrainTab:
             self.status.setText(f"Episode {n} - reste ~{fmt_duration(left)}")
         else:
             self.status.setText(f"Episode {n}")
-        self._log(f"Episode {n} | {length} pas | recompense {reward:.2f} | meilleure {max(self.rewards):.2f}{extra}")
+        self._log(f"Episode {n} | {length} pas | récompense {reward:.2f} | meilleure {max(self.rewards):.2f}{extra}")
         self._reset_trace()
 
     def _on_state(self, s):
         if self._t_learn is None:  # premier pas d'apprentissage : fin de la phase de preparation
             self._t_learn, self._steps_learn0 = time.monotonic(), s["timesteps"] - 1
-            self._log(f"Apprentissage demarre (preparation : {fmt_duration(self._t_learn - self._t_run)}).")
+            self._log(f"Apprentissage démarré (préparation : {fmt_duration(self._t_learn - self._t_run)}).")
             self.progress.setRange(0, self._total_steps)
             self.status.setText("Apprentissage en cours...")
         self.m_steps.set(f"{s['timesteps']:,}".replace(",", " "))
@@ -248,9 +248,9 @@ class TrainTab:
         self.c_rew_step.setData(self.tr_rew)
 
     def _on_finished(self, message):
-        self._log(message + f"  (duree totale : {fmt_duration(time.monotonic() - self._t_run)})")
-        self.status.setText("Termine." if message.startswith("Termine") else
-                            "Arrete." if message.startswith("Arrete") else "Erreur - voir le journal")
+        self._log(message + f"  (durée totale : {fmt_duration(time.monotonic() - self._t_run)})")
+        self.status.setText("Terminé." if message.startswith("Terminé") else
+                            "Arrêté." if message.startswith("Arrêté") else "Erreur - voir le journal")
         self.worker = None
         self.btn_start.setEnabled(True)
         self.btn_stop.setEnabled(False)

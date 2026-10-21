@@ -131,7 +131,7 @@ def test_symlink_is_rejected(tmp_path, other):
 
 @pytest.mark.parametrize("name", ["tool.exe", "lib.dll", "run.bat", "x.ps1", "ext.pyd", "a.sh", "setup.msi"])
 def test_native_executables_and_scripts_are_blocked(tmp_path, other, name):
-    with pytest.raises(ArchiveError, match="executables refuses"):
+    with pytest.raises(ArchiveError, match="exécutables refusés"):
         import_project(make_zip(tmp_path / "x.rls", {f"project/{name}": "MZ"}), other)
 
 
@@ -174,7 +174,7 @@ def test_newer_format_is_refused(tmp_path, other):
     with zipfile.ZipFile(rls, "w") as zf:
         zf.writestr("rlstudio.json", json.dumps({"format": "rlstudio-project", "format_version": 99,
                                                 "app_version": "9.9.9"}))
-    with pytest.raises(ArchiveError, match="plus recente"):
+    with pytest.raises(ArchiveError, match="plus récente"):
         import_project(rls, other)
 
 

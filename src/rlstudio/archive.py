@@ -34,7 +34,7 @@ FORMAT_VERSION = 1
 MANIFEST = "rlstudio.json"
 PREFIX = "project/"
 
-# non exportes : caches, fichiers generes, historique
+# non exportés : caches, fichiers generes, historique
 EXCLUDE_DIRS = {"runs", "identify", "__pycache__", ".git", ".trash", "slprj", ".ipynb_checkpoints", ".vscode", ".idea"}
 EXCLUDE_SUFFIXES = {".pyc", ".pyo", ".slxc", ".autosave", ".asv", ".tmp"}
 EXCLUDE_NAMES = {".DS_Store", "Thumbs.db"}
@@ -133,10 +133,10 @@ def _safe_member(name: str) -> str:
     """Nom normalise d'une entree, ou ArchiveError (zip-slip, chemin absolu, lecteur Windows...)."""
     n = name.replace("\\", "/")
     if not n or n.startswith("/") or (len(n) > 1 and n[1] == ":") or "\x00" in n:
-        raise ArchiveError(f"Chemin refuse dans l'archive : {name!r}")
+        raise ArchiveError(f"Chemin refusé dans l'archive : {name!r}")
     parts = posixpath.normpath(n).split("/")
     if ".." in parts or posixpath.normpath(n) in (".", ""):
-        raise ArchiveError(f"Chemin refuse dans l'archive : {name!r}")
+        raise ArchiveError(f"Chemin refusé dans l'archive : {name!r}")
     return n.rstrip("/")
 
 
@@ -155,8 +155,8 @@ def _read_manifest(zf: zipfile.ZipFile) -> dict:
     if manifest.get("format") != FORMAT:
         raise ArchiveError("Format de fichier inconnu (ce n'est pas un projet RL Studio).")
     if int(manifest.get("format_version", 0)) > FORMAT_VERSION:
-        raise ArchiveError(f"Ce projet a ete cree par une version plus recente de RL Studio "
-                           f"({manifest.get('app_version', '?')}) : mettez l'application a jour.")
+        raise ArchiveError(f"Ce projet a été créé par une version plus récente de RL Studio "
+                           f"({manifest.get('app_version', '?')}) : mettez l'application à jour.")
     return manifest
 
 
@@ -178,7 +178,7 @@ def inspect_archive(path) -> dict:
                 problems.append(f"Fichier hors du dossier du projet : {name!r}")
                 continue
             if stat.S_ISLNK(info.external_attr >> 16):
-                problems.append(f"Lien symbolique refuse : {name!r}")
+                problems.append(f"Lien symbolique refusé : {name!r}")
                 continue
             if info.is_dir():
                 continue
@@ -190,13 +190,13 @@ def inspect_archive(path) -> dict:
             elif suffix in CODE_SUFFIXES:
                 code.append(name[len(PREFIX):])
             if info.compress_size and info.file_size / info.compress_size > MAX_RATIO and info.file_size > 10 * 1024 ** 2:
-                problems.append(f"Taux de compression suspect pour {name!r} (archive piegee ?).")
+                problems.append(f"Taux de compression suspect pour {name!r} (archive piégée ?).")
         if total > MAX_TOTAL_BYTES:
-            problems.append(f"Archive trop volumineuse une fois decompressee ({total / 1024 ** 3:.1f} Go).")
+            problems.append(f"Archive trop volumineuse une fois décompressée ({total / 1024 ** 3:.1f} Go).")
         if PREFIX + "project.yaml" not in names:
             problems.append("project.yaml absent : projet invalide.")
     if blocked:
-        problems.append("Fichiers executables refuses : " + ", ".join(blocked[:8]) + (" ..." if len(blocked) > 8 else ""))
+        problems.append("Fichiers exécutables refusés : " + ", ".join(blocked[:8]) + (" ..." if len(blocked) > 8 else ""))
     return {"manifest": manifest, "files": len(names), "size": total, "code_files": sorted(code),
             "runs": manifest.get("runs", []), "identifications": manifest.get("identifications", []), "problems": problems}
 
@@ -206,13 +206,13 @@ def _validate_config(cfg) -> None:
         raise ArchiveError("project.yaml invalide : le champ « kind » doit valoir python ou simulink.")
     env = cfg.get("env") or {}
     if not isinstance(env, dict):
-        raise ArchiveError("project.yaml invalide : « env » doit etre un dictionnaire.")
+        raise ArchiveError("project.yaml invalide : « env » doit être un dictionnaire.")
     for key in ("entry", "model"):  # chemins vers des fichiers que l'application chargera : confines au projet
         value = env.get(key)
         if value:
             rel = str(value).partition(":")[0].replace("\\", "/")
             if rel.startswith("/") or (len(rel) > 1 and rel[1] == ":") or ".." in posixpath.normpath(rel).split("/"):
-                raise ArchiveError(f"Chemin refuse dans project.yaml : env.{key} = {value!r}")
+                raise ArchiveError(f"Chemin refusé dans project.yaml : env.{key} = {value!r}")
 
 
 # -- import -------------------------------------------------------------------------------
@@ -220,7 +220,7 @@ def import_project(path, store: ProjectStore, name: str | None = None) -> Projec
     """Cree un nouveau projet dans `store` a partir d'un .rls. Ne remplace jamais un projet existant."""
     report = inspect_archive(path)
     if report["problems"]:
-        raise ArchiveError("Import refuse :\n- " + "\n- ".join(report["problems"]))
+        raise ArchiveError("Import refusé :\n- " + "\n- ".join(report["problems"]))
 
     staging = Path(tempfile.mkdtemp(prefix=".import-", dir=store.root))
     try:
@@ -234,13 +234,13 @@ def import_project(path, store: ProjectStore, name: str | None = None) -> Projec
                 rel = _safe_member(info.filename)[len(PREFIX):]
                 target = (root / rel).resolve()
                 if root.resolve() not in target.parents:  # derniere ligne de defense contre le zip-slip
-                    raise ArchiveError(f"Chemin refuse dans l'archive : {info.filename!r}")
+                    raise ArchiveError(f"Chemin refusé dans l'archive : {info.filename!r}")
                 target.parent.mkdir(parents=True, exist_ok=True)
                 with zf.open(info) as src, open(target, "wb") as dst:
                     while chunk := src.read(1 << 20):
                         written += len(chunk)
                         if written > MAX_TOTAL_BYTES:
-                            raise ArchiveError("Archive trop volumineuse une fois decompressee.")
+                            raise ArchiveError("Archive trop volumineuse une fois décompressée.")
                         dst.write(chunk)
         try:
             cfg = yaml.safe_load((root / "project.yaml").read_text(encoding="utf-8-sig"))

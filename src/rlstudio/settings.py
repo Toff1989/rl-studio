@@ -11,7 +11,7 @@ DEFAULTS = {
     "matlab_enabled": True,
     "matlab_root": "",        # vide = detection automatique de la version la plus recente
     "gpu_enabled": True,      # False : tous les entrainements sont forces sur CPU
-    "python_runtime": "",     # vide = runtime installe par l'installateur (ou l'interpreteur courant en dev)
+    "python_runtime": "",     # vide = runtime installé par l'installateur (ou l'interpreteur courant en dev)
     "hardware": {},           # derniere detection du materiel
     "plan": {},               # derniers composants installes
 }

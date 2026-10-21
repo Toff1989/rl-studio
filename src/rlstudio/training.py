@@ -90,22 +90,22 @@ def train(project: Project, on_episode=None, on_state=None, on_baseline=None, sh
         # le moteur MATLAB demarre au premier reset : on le fait ici pour le signaler (et le chronometrer)
         t = time.time()
         if project.kind == "simulink":
-            log("Demarrage de MATLAB / Simulink (quelques dizaines de secondes)...")
+            log("Démarrage de MATLAB / Simulink (quelques dizaines de secondes)...")
         env.reset(seed=int(algo["seed"]))
-        log(f"Environnement pret en {fmt_duration(time.time() - t)}.")
+        log(f"Environnement prêt en {fmt_duration(time.time() - t)}.")
         n_base = int(algo.get("baseline_episodes", 0))
         if n_base > 0:
             policy = make_baseline(project, env)
             label = "politique du projet"
             if policy is None:
-                policy, label = (lambda obs: env.action_space.sample()), "politique aleatoire"
-            log(f"Evaluation de reference : {n_base} episode(s) avec la {label} (avant l'apprentissage).")
+                policy, label = (lambda obs: env.action_space.sample()), "politique aléatoire"
+            log(f"Évaluation de référence : {n_base} episode(s) avec la {label} (avant l'apprentissage).")
             t_base = time.time()
             ep_steps = getattr(env, "n_steps", None)
 
             def base_episode(i, n, ret, duration):
                 left = (time.time() - t_base) / (i + 1) * (n - i - 1)
-                log(f"Reference {i + 1}/{n} | recompense {ret:.2f} | {fmt_duration(duration)}"
+                log(f"Reference {i + 1}/{n} | récompense {ret:.2f} | {fmt_duration(duration)}"
                     + (f" | reste ~{fmt_duration(left)}" if i + 1 < n else ""))
                 if on_progress:
                     on_progress("baseline", (i + 1) / n)
@@ -115,7 +115,7 @@ def train(project: Project, on_episode=None, on_state=None, on_baseline=None, sh
                     on_progress("baseline", (i + min(k / ep_steps, 1.0)) / n)
 
             mean, std = evaluate(env, policy, n_base, on_episode=base_episode, on_step=base_step)
-            log(f"Reference ({label}) : {mean:.3f} +/- {std:.3f}")
+            log(f"Référence ({label}) : {mean:.3f} +/- {std:.3f}")
             if on_baseline:
                 on_baseline(mean, label)
             (run_dir / "baseline.json").write_text(json.dumps({"label": label, "mean": mean, "std": std}))
@@ -131,7 +131,7 @@ def train(project: Project, on_episode=None, on_state=None, on_baseline=None, sh
         t0 = time.time()
         model.learn(int(algo["total_timesteps"]), callback=_callback(on_episode, on_state, should_stop, state_every))
         model.save(run_dir / "model")
-        log(f"Termine en {time.time() - t0:.0f} s. Modele : {run_dir / 'model.zip'}")
+        log(f"Terminé en {time.time() - t0:.0f} s. Modèle : {run_dir / 'model.zip'}")
     finally:
         env.close()
     return run_dir

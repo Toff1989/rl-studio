@@ -43,7 +43,7 @@ def run_provision(args) -> int:
         with open(args.hardware, encoding="utf-8") as fh:
             hw = json.load(fh)
     else:
-        print("Detection du materiel...")
+        print("Détection du matériel...")
         hw = run_scan()
     plan = components.make_plan(hw, gpu_enabled=not args.no_gpu and bool(settings.get("gpu_enabled")),
                                 matlab_enabled=not args.no_matlab and bool(settings.get("matlab_enabled")),
@@ -72,7 +72,7 @@ def run_provision(args) -> int:
         if plan["matlab"].get("root") and not settings.get("matlab_root"):
             update["matlab_root"] = plan["matlab"]["root"]
         settings.update(update)
-    print("\nTermine." if not result["errors"] else "\nTermine avec des avertissements : " + "; ".join(result["errors"]))
+    print("\nTerminé." if not result["errors"] else "\nTerminé avec des avertissements : " + "; ".join(result["errors"]))
     return 0 if not result["errors"] else 1
 
 
@@ -106,9 +106,9 @@ def main(argv=None):
     ap.add_argument("--no-matlab", action="store_true")
     ap.add_argument("--skip", nargs="*", choices=["base", "torch", "matlab"])
     ap.add_argument("--dry-run", action="store_true")
-    ap.add_argument("--pause-on-error", action="store_true", help="attend une touche si l'installation echoue")
+    ap.add_argument("--pause-on-error", action="store_true", help="attend une touche si l'installation échoue")
     ap.add_argument("--selftest", action="store_true")
-    ap.add_argument("file", nargs="?", help="fichier .rls a importer (double-clic dans l'Explorateur)")
+    ap.add_argument("file", nargs="?", help="fichier .rls à importer (double-clic dans l'Explorateur)")
     args = ap.parse_args(argv)
     if args.scan:
         run_scan(args.out)
@@ -116,7 +116,7 @@ def main(argv=None):
     if args.provision:
         code = run_provision(args)
         if code and args.pause_on_error and sys.stdin is not None and sys.stdin.isatty():
-            input("\nAppuyez sur Entree pour fermer... (les composants pourront etre reinstalles depuis Parametres)")
+            input("\nAppuyez sur Entrée pour fermer... (les composants pourront être réinstallés depuis Paramètres)")
         return code
     if args.selftest:
         return run_selftest()
