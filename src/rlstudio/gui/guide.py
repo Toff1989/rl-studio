@@ -32,6 +32,8 @@ class GuideView(QWidget):
         self.browser.setToolTip("Guide d'utilisation de RL Studio. Utilisez le sommaire à gauche ou la recherche pour naviguer.")
         self.toc = QListWidget()
         self.toc.setFixedWidth(260)
+        self.toc.setWordWrap(True)
+        self.toc.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.toc.setToolTip("Sommaire du guide : cliquez sur une section pour y aller.")
         self.search = QLineEdit()
         self.search.setPlaceholderText("Rechercher dans le guide…")

@@ -1,4 +1,4 @@
-"""Interface graphique : fenetre principale (assemblage des onglets et des actions)."""
+"""Interface graphique : fenêtre principale (assemblage des onglets et des actions)."""
 import sys
 
 from PySide6.QtGui import QIcon, QKeySequence, QShortcut

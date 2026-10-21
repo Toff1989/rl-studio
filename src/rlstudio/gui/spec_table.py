@@ -38,7 +38,7 @@ INIT_TIPS = {
 
 
 class SpecTable(QTableWidget):
-    """Table editable <-> liste de dicts."""
+    """Table éditable <-> liste de dicts."""
 
     changed = Signal()
 

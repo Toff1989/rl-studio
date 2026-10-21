@@ -1,4 +1,4 @@
-"""Actions sur les projets : liste, creation, enregistrement, partage (.rls), conversion Simulink."""
+"""Actions sur les projets : liste, création, enregistrement, partage (.rls), conversion Simulink."""
 import os
 from pathlib import Path
 import sys
@@ -14,7 +14,7 @@ from .widgets import label
 
 
 class ProjectActions:
-    """Methodes de MainWindow (actions sur les projets : liste, creation, enregistrement, partage)."""
+    """Méthodes de MainWindow (actions sur les projets : liste, création, enregistrement, partage)."""
 
     def _item_widget(self, p: Project):
         w = QWidget()
