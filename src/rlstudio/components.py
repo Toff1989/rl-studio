@@ -35,7 +35,7 @@ def _ver(text):
 def plan_torch(hw: dict, gpu_enabled=True) -> dict:
     nvidia = [g for g in hw.get("gpus") or [] if g.get("vendor") == "NVIDIA"]
     if not gpu_enabled:
-        return {"variant": "cpu", "candidates": [], "reason": "GPU desactive dans les paramètres."}
+        return {"variant": "cpu", "candidates": [], "reason": "GPU désactivé dans les paramètres."}
     if not nvidia:
         return {"variant": "cpu", "candidates": [], "reason": "Aucune carte NVIDIA détectée : PyTorch CPU."}
     driver_cuda = _ver(hw.get("cuda_driver"))
@@ -63,9 +63,9 @@ def plan_matlab(hw: dict, enabled=True, root="") -> dict:
         installs = [info] if info else []
     usable = [m for m in installs if m.get("complete") and m.get("engine_series")]
     if not usable:
-        why = "Aucune installation MATLAB complete détectée."
+        why = "Aucune installation MATLAB complète détectée."
         if any(not m.get("complete") for m in installs):
-            why = "Installation(s) MATLAB incomplete(s) : réinstaller MATLAB (avec Simulink)."
+            why = "Installation(s) MATLAB incomplète(s) : réinstaller MATLAB (avec Simulink)."
         return {"enabled": False, "reason": why}
     m = usable[0]
     py_ok = not m.get("engine_python_versions") or BUNDLED_PYTHON in m["engine_python_versions"]

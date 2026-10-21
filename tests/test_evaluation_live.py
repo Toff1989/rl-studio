@@ -27,6 +27,7 @@ def trained(tmp_path_factory):
     return p, run_dir
 
 
+@pytest.mark.runtime
 def test_run_evaluation_streams_steps_and_episodes(trained):
     p, run_dir = trained
     steps, eps, metas = [], [], []
@@ -39,6 +40,7 @@ def test_run_evaluation_streams_steps_and_episodes(trained):
     assert s["episodes"] < 5
 
 
+@pytest.mark.runtime
 def test_distilled_policy_can_be_replayed(trained):
     p, run_dir = trained
     run_distillation(p, run_dir, DistillOptions(methods=("linear",), episodes=2, dagger_iters=0, eval_episodes=1, max_steps=30), log=lambda m: None)
@@ -48,6 +50,7 @@ def test_distilled_policy_can_be_replayed(trained):
     assert s["episodes"] == 1
 
 
+@pytest.mark.runtime
 def test_worker_evaluate_events(trained):
     p, run_dir = trained
     r = subprocess.run([sys.executable, "-m", "rlstudio.worker", "evaluate", "--project", str(p.path), "--run", run_dir.name,
@@ -57,6 +60,8 @@ def test_worker_evaluate_events(trained):
     assert r.returncode == 0 and kinds[0] == "meta" and "step" in kinds and kinds.count("episode") == 2 and kinds[-1] == "done"
 
 
+@pytest.mark.runtime
+@pytest.mark.gui
 def test_series_plot_and_eval_tab(trained, tmp_path):
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     from PySide6.QtWidgets import QApplication
@@ -86,6 +91,7 @@ def test_series_plot_and_eval_tab(trained, tmp_path):
     app.processEvents()
 
 
+@pytest.mark.gui
 def test_series_plot_many_signals_distinct_colors_and_toggle():
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     from PySide6.QtWidgets import QApplication
@@ -110,6 +116,7 @@ def test_series_plot_many_signals_distinct_colors_and_toggle():
     app.processEvents()
 
 
+@pytest.mark.gui
 def test_series_plot_append_is_cheap_and_coalesced():
     """L'interface ne doit pas ralentir quand les points s'accumulent : ajout O(1), dessins regroupes."""
     import time
@@ -146,6 +153,7 @@ def test_series_plot_append_is_cheap_and_coalesced():
     assert len(pl.curves) == 5
 
 
+@pytest.mark.gui
 def test_decimate_keeps_peaks_and_bounds_size():
     from rlstudio.gui.live_plots import MAX_DRAWN, decimate
 

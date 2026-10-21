@@ -134,7 +134,7 @@ def identify_env(env, opts, name="env", out_dir=None, log=print, progress=None, 
         if n in opts.fixed:
             low[i] = high[i] = float(np.clip(float(opts.fixed[n]), env_low[i], env_high[i]))
     sweep_kw = dict(hold_max=opts.hold_max, extreme=opts.extreme, max_steps=opts.max_steps, should_stop=should_stop, action_fn=action_fn, bounds=(low, high))
-    log(f"Balayage : {opts.episodes} episode(s) d'apprentissage + {opts.val_episodes} de validation (actions variées, paliers de 1 a {opts.hold_max} pas) ...")
+    log(f"Balayage : {opts.episodes} épisode(s) d'apprentissage + {opts.val_episodes} de validation (actions variées, paliers de 1 a {opts.hold_max} pas) ...")
     train = collect.sweep(env, opts.episodes, 100 + opts.seed, rng, on_episode=lambda k, n: bump(f"Balayage : épisode {k}/{n}"), **sweep_kw)
     val = collect.sweep(env, opts.val_episodes, 900_000 + opts.seed, rng, on_episode=lambda k, n: bump(f"Validation : épisode {k}/{n}"), **sweep_kw)
     if not len(train) or not len(val):
@@ -179,7 +179,7 @@ def identify_env(env, opts, name="env", out_dir=None, log=print, progress=None, 
             entry["files"] = write_candidate(out_dir / cid, model)
         candidates.append(entry)
         bump(f"Ajustement : {cid}")
-        log(f"  complexite {entry['complexity']:6d}  R2 un pas {res['r2_one_step']:7.4f}  fidélité en simulation libre {res['free_r2']:7.4f}"
+        log(f"  complexité {entry['complexity']:6d}  R2 un pas {res['r2_one_step']:7.4f}  fidélité en simulation libre {res['free_r2']:7.4f}"
             f"{'  (divergence sur ' + str(res['diverged']) + ' episode(s))' if res['diverged'] else ''}")
 
     ok = [c for c in candidates if c["free_r2"] >= 1.0 - opts.margin]
@@ -265,7 +265,7 @@ def write_report(report: dict, out_dir: Path):
 def _steady_markdown(r: dict) -> str:
     lines = [f"# Modèle entrées -> sorties en régime permanent - {r['project']}", "",
              f"Généré le {r['created']} par RL Studio {r['version']} : {r['n_train']} points d'apprentissage, {r['n_val']} de validation, "
-             f"{r['dropped']} ecarte(s) ; stabilisation en {r['mean_settle_steps']:.1f} pas en moyenne.", "",
+             f"{r['dropped']} écarté(s) ; stabilisation en {r['mean_settle_steps']:.1f} pas en moyenne.", "",
              f"Entrées : {', '.join(r['in_names'])} ; sorties : {', '.join(r['out_names'])}.", "",
              "R2 sur des points jamais vus : 1 = carte reproduite, 0 = aussi mauvais qu'une valeur moyenne.", "",
              "| Modèle | Complexité | R2 | NRMSE | Erreur max | |", "|---|---:|---:|---:|---:|---|"]

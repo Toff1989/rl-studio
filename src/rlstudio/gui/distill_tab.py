@@ -14,15 +14,45 @@ from PySide6.QtWidgets import (
 
 from ..distill import METHOD_LABELS, METHODS
 from ..distill.export import distill_dir, load_report
+from .notify import looks_like_error, summarize
 from .runner import DistillRunner, RuntimeMissing, WorkerJob
 from .theme import C
-from .widgets import Card, button, fmt_run_date, label
+from .widgets import Card, button, fmt_run_date, header_tips, label, tips
 
 COLUMNS = ["Modèle", "Complexité", "R2 (états de l'expert)", "Retour", "Score", "Menés à terme", ""]
-
+COLUMN_TIPS = [
+    "Famille du modèle extrait.",
+    "Nombre de paramètres du modèle : plus il est petit, plus le modèle est simple à lire.",
+    "R2 : part des décisions de l'agent reproduite par le modèle, dans les situations rencontrées par l'agent (1 = identique). "
+    "Un R2 élevé ne garantit pas une bonne performance : regardez le score.",
+    "Récompense moyenne obtenue par le modèle quand il pilote seul le système (boucle fermée).",
+    "Performance normalisée : 0 = politique aléatoire, 1 = agent entraîné. Le trait jaune du graphique marque la tolérance.",
+    "Part des épisodes terminés sans arrêt anticipé (donc sans « sortie de route »).",
+    "Le modèle recommandé est le plus simple dont le score reste dans la tolérance.",
+]
+METHOD_TIPS = {
+    "linear": "Régulateur linéaire : action = gains × observations (avec intégrale pour un PID). Très lisible : à essayer en premier.",
+    "polynomial": "Polynôme des observations (degrés 2 et 3, termes croisés inclus). Un peu plus souple qu'un régulateur linéaire.",
+    "table": "Table de gains : actions tabulées sur une grille d'une ou deux observations, avec interpolation (voir « Dimensions de la table »).",
+    "tree": "Arbre de décision : suite de tests « observation < seuil » qui aboutit à une action. Lisible mais par paliers.",
+    "symbolic": "Équation parcimonieuse : peu de termes (sin, cos, produits…) retrouvés automatiquement.",
+    "neural": "Copie exacte du réseau de neurones de l'agent. Fidèle mais opaque : sert de référence.",
+}
+FIELD_TIPS = {
+    "Épisodes de collecte": "Nombre d'épisodes joués par l'agent pour recueillir des exemples de ses décisions.",
+    "Bruit d'action": "Variation aléatoire ajoutée aux actions de l'agent pendant la collecte (en % de l'amplitude de l'action) : elle élargit les situations rencontrées.",
+    "Tours de DAgger": "Tours de correction : le modèle extrait est rejoué, l'agent indique l'action qu'il aurait choisie dans ces situations, et le modèle est réajusté. "
+                       "Réduit la dérive en boucle fermée. 0 = désactivé.",
+    "Épisodes / tour": "Nombre d'épisodes joués à chaque tour de DAgger.",
+    "Épisodes d'évaluation": "Nombre d'épisodes utilisés pour comparer chaque modèle à l'agent en boucle fermée (c'est ce qui donne le score).",
+    "Tolérance": "Écart de score accepté par rapport à l'agent. Le modèle le plus simple dont le score reste dans cette tolérance est recommandé.",
+    "Dimensions de la table": "Nombre d'observations (1 ou 2) en entrée de la table de gains.",
+    "Observations intégrées (PID)": "Observations dont on ajoute l'intégrale (action intégrale d'un PID), séparées par des virgules. Ex. : angle, position. Vide = pas d'intégrale.",
+}
 
 class DistillTab(QWidget):
     busy = Signal(bool)  # un calcul est en cours : le parent bloque le changement de projet
+    error = Signal(str, str)  # (résumé, détail) : une erreur à montrer dans le bandeau de la fenêtre principale
 
     def __init__(self, settings, parent=None):
         super().__init__(parent)
@@ -41,6 +71,7 @@ class DistillTab(QWidget):
         meth = QHBoxLayout()
         for m in METHODS:
             cb = QCheckBox(METHOD_LABELS[m])
+            cb.setToolTip(METHOD_TIPS.get(m, ""))
             cb.setChecked(True)
             self.method_boxes[m] = cb
             meth.addWidget(cb)
@@ -60,9 +91,11 @@ class DistillTab(QWidget):
                   ("Épisodes / tour", self.f_dagger_eps), ("Épisodes d'évaluation", self.f_eval), ("Tolérance", self.f_margin),
                   ("Dimensions de la table", self.f_dims)]
         for i, (txt, w) in enumerate(fields):
-            grid.addWidget(label(txt, "sectionLabel"), (i // 4) * 2, i % 4)
+            w.setToolTip(FIELD_TIPS[txt])
+            grid.addWidget(label(txt, "sectionLabel", tip=FIELD_TIPS[txt]), (i // 4) * 2, i % 4)
             grid.addWidget(w, (i // 4) * 2 + 1, i % 4)
-        grid.addWidget(label("Observations intégrées (PID)", "sectionLabel"), 2, 3)
+        grid.addWidget(label("Observations intégrées (PID)", "sectionLabel", tip=FIELD_TIPS["Observations intégrées (PID)"]), 2, 3)
+        self.f_integ.setToolTip(FIELD_TIPS["Observations intégrées (PID)"])
         grid.addWidget(self.f_integ, 3, 3)
 
         self.btn_start = button("Extraire le modèle", "primary", self._start)
@@ -109,6 +142,7 @@ class DistillTab(QWidget):
         # resultats
         self.table = QTableWidget(0, len(COLUMNS))
         self.table.setHorizontalHeaderLabels(COLUMNS)
+        header_tips(self.table, COLUMN_TIPS)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setSelectionMode(QTableWidget.SingleSelection)
@@ -159,6 +193,27 @@ class DistillTab(QWidget):
         outer.setContentsMargins(0, 0, 0, 0)
         from .widgets import scroll_page  # noqa: PLC0415
         outer.addWidget(scroll_page(inner))
+        tips(self, {
+            "run_combo": "Entraînement dont on extrait la loi de commande (seuls ceux qui ont un modèle enregistré sont proposés).",
+            "btn_start": "Lance l'extraction : collecte des décisions de l'agent, ajustement des familles de modèles cochées, comparaison en boucle fermée.",
+            "btn_stop": "Interrompt l'extraction en cours.",
+            "progress": "Avancement de l'extraction.",
+            "stage": "Étape en cours.",
+            "timing": "Temps écoulé et estimation du temps restant.",
+            "status": "Résultat de l'extraction.",
+            "logbox": "Journal détaillé de l'extraction. Les erreurs s'affichent aussi dans le bandeau en haut de la fenêtre.",
+            "summary": "Performance de l'agent entraîné et d'une politique aléatoire, pour situer les scores.",
+            "table": "Modèles extraits, du plus simple au plus complexe. Cliquez sur une ligne pour voir ses équations et ses graphiques. La mention « recommandé » désigne le plus simple qui reste dans la tolérance.",
+            "pareto": "Score en fonction de la complexité (échelle logarithmique) : cherchez le modèle le plus simple au-dessus de la ligne jaune (tolérance). En vert : le modèle recommandé.",
+            "scatter": "Action du modèle contre action de l'agent dans les mêmes situations : plus les points sont proches de la diagonale, plus le modèle est fidèle.",
+            "equations": "Équations ou description du modèle sélectionné.",
+            "notes": "Remarques et avertissements sur l'extraction (à lire avant tout usage du modèle).",
+            "btn_copy_py": "Copie le code Python du modèle sélectionné dans le presse-papiers.",
+            "btn_copy_m": "Copie le code MATLAB du modèle sélectionné dans le presse-papiers.",
+            "btn_save": "Enregistre le modèle sélectionné dans un fichier (Python, MATLAB, équations ou JSON).",
+            "btn_slx": "Crée un modèle Simulink contenant le modèle sélectionné comme contrôleur (MATLAB requis).",
+            "btn_open": "Affiche dans l'Explorateur le dossier des fichiers de l'extraction.",
+        })
         self._set_result_buttons(False)
         self.restyle()
 
@@ -338,6 +393,8 @@ class DistillTab(QWidget):
 
     def _on_log(self, text):
         self.logbox.appendPlainText(text.rstrip())
+        if looks_like_error(text):
+            self.error.emit(summarize(text), text)
 
     def _on_progress(self, stage, fraction):
         self._fraction = fraction
@@ -371,7 +428,8 @@ class DistillTab(QWidget):
         self.timing.setText(f"Durée : {self._fmt(elapsed)}")
         if message.startswith("ERREUR"):
             self.logbox.appendPlainText(message)
-            self.status.setText("Échec de l'extraction : voir le journal ci-dessus.")
+            self.status.setText("Échec de l'extraction : " + summarize(message))
+            self.error.emit("Échec de l'extraction : " + summarize(message), message)
         else:
             self.status.setText("Extraction terminée." if message.startswith("Terminé") else "Extraction arrêtée.")
             self.progress.setValue(1000 if message.startswith("Terminé") else self.progress.value())
@@ -419,11 +477,18 @@ class DistillTab(QWidget):
             return
         args = ["export-simulink", "--project", str(self.project.path), "--run", d.name, "--candidate", c["id"], "--out", target]
         self.job = WorkerJob(self.settings, args, self)
-        self.job.done.connect(lambda res, err: self.status.setText(f"Modèle Simulink créé : {res['path']}" if res else f"ERREUR : {err}"))
+        self.job.done.connect(self._simulink_done)
         self.btn_slx.setEnabled(False)
         self.job.done.connect(lambda *_: self.btn_slx.setEnabled(True))
         self.status.setText("Génération du modèle Simulink (démarrage de MATLAB) ...")
         self.job.start()
+
+    def _simulink_done(self, res, err):
+        if res:
+            self.status.setText(f"Modèle Simulink créé : {res['path']}")
+            return
+        self.status.setText("Échec de l'export Simulink : " + summarize(err))
+        self.error.emit("Échec de l'export Simulink : " + summarize(err), err)
 
     def _open_dir(self):
         d = self._run_dir()

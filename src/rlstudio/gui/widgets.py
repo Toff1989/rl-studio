@@ -2,18 +2,48 @@
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QScrollArea, QVBoxLayout, QWidget
 
-def button(text, variant=None, slot=None):
+def tip(widget, text):
+    """Infobulle (survol) sur un widget ; renvoie le widget pour pouvoir chaîner."""
+    if text:
+        widget.setToolTip(text)
+    return widget
+
+
+def tips(owner, mapping):
+    """Infobulles en lot : {nom d'attribut de `owner`: texte}. Une faute de frappe dans le nom échoue tout de suite."""
+    for name, text in mapping.items():
+        tip(getattr(owner, name), text)
+
+
+def header_tips(table, texts):
+    """Infobulles des en-têtes de colonnes d'un tableau (liste alignée sur les colonnes ; texte vide = aucune)."""
+    for j, text in enumerate(texts):
+        item = table.horizontalHeaderItem(j)
+        if item is not None and text:
+            item.setToolTip(text)
+
+
+def form_row(form, text, widget, tooltip):
+    """Ligne de formulaire dont l'étiquette et le champ portent la même infobulle."""
+    form.addRow(tip(QLabel(text), tooltip), tip(widget, tooltip))
+
+
+def button(text, variant=None, slot=None, tip=None):
     b = QPushButton(text)
     if variant:
         b.setProperty("variant", variant)
     if slot:
         b.clicked.connect(slot)
     b.setCursor(Qt.PointingHandCursor)
+    if tip:
+        b.setToolTip(tip)
     return b
 
 
-def label(text="", name=None, wrap=False):
+def label(text="", name=None, wrap=False, tip=None):
     lb = QLabel(text)
+    if tip:
+        lb.setToolTip(tip)
     if name:
         lb.setObjectName(name)
     lb.setWordWrap(wrap)
@@ -23,9 +53,11 @@ def label(text="", name=None, wrap=False):
 class Card(QFrame):
     """Bloc arrondi avec titre optionnel ; remplir via `.body` (QVBoxLayout)."""
 
-    def __init__(self, title=None, hint=None):
+    def __init__(self, title=None, hint=None, tip=None):
         super().__init__()
         self.setObjectName("card")
+        if tip:
+            self.setToolTip(tip)
         self.body = QVBoxLayout(self)
         self.body.setContentsMargins(18, 16, 18, 16)
         self.body.setSpacing(10)
@@ -36,9 +68,11 @@ class Card(QFrame):
 
 
 class Kpi(QFrame):
-    def __init__(self, title):
+    def __init__(self, title, tip=None):
         super().__init__()
         self.setObjectName("card")
+        if tip:
+            self.setToolTip(tip)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(16, 12, 16, 12)
         lay.setSpacing(2)

@@ -2,6 +2,8 @@
 import numpy as np
 import pytest
 
+pytestmark = pytest.mark.runtime
+
 from rlstudio.distill import DistillOptions, run_distillation
 from rlstudio.distill.export import distill_dir, load_candidate, load_report
 from rlstudio.distill.policy import load_expert

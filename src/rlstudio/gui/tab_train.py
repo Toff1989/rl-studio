@@ -1,4 +1,4 @@
-"""Onglet Entrainement (graphiques en direct, journal, demarrage / arret)."""
+"""Onglet Entraînement : graphiques en direct, journal, démarrage et arrêt."""
 import time
 
 import numpy as np
@@ -12,15 +12,16 @@ from ..envs.spec import validate_spec
 from ..training import fmt_duration
 from .theme import C
 from .live_plots import SeriesPlot
+from .notify import looks_like_error, summarize
 from .runner import RuntimeMissing, TrainRunner
-from .widgets import Card, Kpi, button, label
+from .widgets import Card, Kpi, button, label, tips
 
 
 LOG_MAX_LINES = 5000
 
 
 class TrainTab:
-    """Methodes de MainWindow (onglet entrainement)."""
+    """Méthodes de MainWindow (onglet Entraînement)."""
 
     def _plot(self, title):
         pw = pg.PlotWidget()
@@ -124,6 +125,23 @@ class TrainTab:
         main.addLayout(grid, 1)
         main.addWidget(side)
         lay.addLayout(main, 1)
+        tips(self, {
+            "btn_start": "Enregistre le projet puis lance l'entraînement. Le premier démarrage prend quelques secondes (chargement de PyTorch, de MATLAB pour un projet Simulink).",
+            "btn_stop": "Interrompt l'entraînement tout de suite. Le modèle partiel est conservé s'il a pu être enregistré.",
+            "progress": "Avancement : d'abord l'évaluation de référence, puis l'apprentissage (en pas sur la durée totale réglée dans l'onglet Algorithme).",
+            "status": "État du calcul et temps restant estimé.",
+            "m_eps": "Nombre d'épisodes (essais complets) terminés depuis le début de l'entraînement.",
+            "m_steps": "Nombre de pas simulés depuis le début de l'apprentissage, à comparer à la durée réglée dans l'onglet Algorithme.",
+            "m_last": "Récompense totale du dernier épisode terminé.",
+            "m_best": "Meilleure récompense totale obtenue sur un épisode depuis le début.",
+            "m_base": "Récompense moyenne de la politique de référence (régulateur classique du projet, sinon actions aléatoires). Objectif : faire mieux.",
+            "chk_norm": "Ramène chaque signal à l'échelle 0–1 pour comparer des grandeurs d'ordres de grandeur très différents.",
+            "p_reward": "Récompense totale de chaque épisode (points) et moyenne glissante sur 10 épisodes (courbe jaune). La ligne rouge pointillée est la référence. Une courbe qui monte puis se stabilise est bon signe.",
+            "p_obs": "Observations (ce que l'agent voit) pendant l'épisode en cours. Cliquez sur un nom de la légende pour masquer ou afficher une courbe.",
+            "p_act": "Actions (ce que l'agent commande) pendant l'épisode en cours. Cliquez sur un nom de la légende pour masquer ou afficher une courbe.",
+            "p_rew_step": "Récompense obtenue à chaque pas de l'épisode en cours.",
+            "logbox": "Journal détaillé de l'entraînement : démarrage, évaluation de référence, une ligne par épisode (vitesse, temps restant). Les erreurs s'affichent aussi dans le bandeau en haut de la fenêtre.",
+        })
         self._reset_train_state()
         return page
 
@@ -149,6 +167,8 @@ class TrainTab:
         stamp = time.strftime("%H:%M:%S")
         for line in str(text).rstrip().splitlines() or [""]:
             self.logbox.appendPlainText(f"[{stamp}] {line}")
+            if looks_like_error(line):  # une erreur écrite dans le journal doit aussi se voir ailleurs que dans le journal
+                self.report_error(summarize(line), str(text))
 
     def _start(self):
         if not self.project or not self._save():
@@ -221,10 +241,10 @@ class TrainTab:
             rate = done / max(time.monotonic() - self._t_learn, 1e-6)
             left = max(self._total_steps - steps, 0) / rate
             extra = f" | {rate:.1f} pas/s | reste ~{fmt_duration(left)}"
-            self.status.setText(f"Episode {n} - reste ~{fmt_duration(left)}")
+            self.status.setText(f"Épisode {n} - reste ~{fmt_duration(left)}")
         else:
-            self.status.setText(f"Episode {n}")
-        self._log(f"Episode {n} | {length} pas | récompense {reward:.2f} | meilleure {max(self.rewards):.2f}{extra}")
+            self.status.setText(f"Épisode {n}")
+        self._log(f"Épisode {n} | {length} pas | récompense {reward:.2f} | meilleure {max(self.rewards):.2f}{extra}")
         self._reset_trace()
 
     def _on_state(self, s):
@@ -249,8 +269,11 @@ class TrainTab:
 
     def _on_finished(self, message):
         self._log(message + f"  (durée totale : {fmt_duration(time.monotonic() - self._t_run)})")
-        self.status.setText("Terminé." if message.startswith("Terminé") else
-                            "Arrêté." if message.startswith("Arrêté") else "Erreur - voir le journal")
+        if message.startswith("ERREUR"):
+            self.status.setText("Erreur : " + summarize(message))
+            self.report_error("Échec de l'entraînement : " + summarize(message), message)
+        else:
+            self.status.setText("Terminé." if message.startswith("Terminé") else "Arrêté.")
         self.worker = None
         self.btn_start.setEnabled(True)
         self.btn_stop.setEnabled(False)

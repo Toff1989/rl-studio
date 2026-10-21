@@ -1,7 +1,9 @@
 """CLI : gestion de projets et entrainement sans interface."""
 import argparse
+import sys
 
 from .project import ProjectStore
+from .pyversion import support_warning
 from .training import train
 
 
@@ -51,6 +53,9 @@ def main(argv=None):
     p.add_argument("fichier")
     p.add_argument("--yes", action="store_true", help="ne pas demander confirmation (projets de confiance uniquement)")
     args = ap.parse_args(argv)
+    warning = support_warning()
+    if warning:
+        print("Avertissement : " + warning, file=sys.stderr)
 
     store = ProjectStore()
     if args.cmd == "list":
@@ -122,7 +127,7 @@ def main(argv=None):
         pr = store.get(args.slug)
         if args.timesteps:
             pr.cfg["algo"]["total_timesteps"] = args.timesteps
-        train(pr, on_episode=lambda n, r, l, s: print(f"episode {n:4d} | pas {s:7d} | récompense {r:9.3f}"))
+        train(pr, on_episode=lambda n, r, l, s: print(f"épisode {n:4d} | pas {s:7d} | récompense {r:9.3f}"))
 
 
 if __name__ == "__main__":

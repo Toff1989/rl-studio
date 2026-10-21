@@ -15,6 +15,10 @@ REQUIRED_FILES = [
     # le modele Simulink du template est un travail tiers (MIT) : son avis de copyright doit accompagner chaque copie
     "resources/templates/cartpole_simulink/LICENSE-modele.txt",
 ]
+# ressources dont l'application a besoin a l'execution (hors licences)
+REQUIRED_RESOURCES = [
+    "resources/docs/guide.md",  # guide d'utilisation affiche dans l'application (F1)
+]
 
 
 def check(bundle) -> list[str]:
@@ -43,6 +47,9 @@ def check(bundle) -> list[str]:
     for rel in REQUIRED_FILES:
         if not (bundle / rel).is_file():
             problems.append(f"fichier de licence manquant : {rel}")
+    for rel in REQUIRED_RESOURCES:
+        if not (bundle / rel).is_file():
+            problems.append(f"ressource manquante : {rel}")
     return problems
 
 

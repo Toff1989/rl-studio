@@ -65,7 +65,7 @@ def run_evaluation(project, run_dir, policy_id="agent", episodes=5, seed=1000, d
         summary = {"episodes": len(returns), "return_mean": float(np.mean(returns)) if returns else 0.0,
                    "return_std": float(np.std(returns)) if returns else 0.0,
                    "length_mean": float(np.mean(lengths)) if lengths else 0.0}
-        log(f"Évaluation : {summary['episodes']} episode(s), retour moyen {summary['return_mean']:.3f} +/- {summary['return_std']:.3f}")
+        log(f"Évaluation : {summary['episodes']} épisode(s), retour moyen {summary['return_mean']:.3f} +/- {summary['return_std']:.3f}")
         return summary
     finally:
         if own:

@@ -110,7 +110,7 @@ def steady_env(env, opts, name="env", out_dir=None, log=print, progress=None, sh
         progress(stage, min(0.999, done[0] / total))
 
     kw = dict(rtol=opts.rtol, atol=opts.atol, window=opts.window, max_steps=opts.max_settle_steps, scenario=opts.scenario, should_stop=should_stop, swept=swept, base=base)
-    log(f"Régime permanent : {opts.samples} point(s) d'apprentissage + {opts.val_samples} de validation (hypercube latin sur {len(low)} entree(s) : {', '.join(names_a[i] for i in swept)}) ...")
+    log(f"Régime permanent : {opts.samples} point(s) d'apprentissage + {opts.val_samples} de validation (hypercube latin sur {len(low)} entrée(s) : {', '.join(names_a[i] for i in swept)}) ...")
     train = collect.steady_sweep(env, collect.latin_hypercube(rng, opts.samples, low, high, opts.extreme), 100 + opts.seed,
                                  on_point=lambda k, n: bump(f"Points d'apprentissage : {k}/{n}"), **kw)
     val = collect.steady_sweep(env, rng.uniform(low, high, (opts.val_samples, len(low))), 900_000 + opts.seed,
@@ -122,7 +122,7 @@ def steady_env(env, opts, name="env", out_dir=None, log=print, progress=None, sh
         train.select_outputs(opts.outputs)
         val.select_outputs(opts.outputs)
     dropped = train.dropped + val.dropped
-    log(f"  {len(train)} + {len(val)} points stabilisés (en moyenne {np.mean(train.steps + val.steps):.1f} pas), {dropped} ecarte(s) faute de convergence")
+    log(f"  {len(train)} + {len(val)} points stabilisés (en moyenne {np.mean(train.steps + val.steps):.1f} pas), {dropped} écarté(s) faute de convergence")
     if len(train) < 5 or len(val) < 2:
         raise ValueError("Trop peu de points stabilisés : augmenter la durée max (`max_settle_steps`) ou assouplir `rtol` / `atol`.")
 
@@ -148,7 +148,7 @@ def steady_env(env, opts, name="env", out_dir=None, log=print, progress=None, sh
             entry["files"] = write_candidate(out_dir / cid, model)
         candidates.append(entry)
         bump(f"Ajustement : {cid}")
-        log(f"  complexite {entry['complexity']:6d}  R2 {res['r2']:7.4f}  erreur max {res['max_abs_err']:.2f} ecart-type")
+        log(f"  complexité {entry['complexity']:6d}  R2 {res['r2']:7.4f}  erreur max {res['max_abs_err']:.2f} écart-type")
 
     ok = [c for c in candidates if c["r2"] >= 1.0 - opts.margin]
     recommended = (min(ok, key=lambda c: c["complexity"]) if ok else max(candidates, key=lambda c: c["r2"]))["id"]

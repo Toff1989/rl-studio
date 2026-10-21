@@ -7,7 +7,7 @@ check_bundle = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(check_bundle)
 
 
-def make_bundle(root: Path, extra_dlls=(), plugin_dirs=("platforms", "styles"), with_licenses=True):
+def make_bundle(root: Path, extra_dlls=(), plugin_dirs=("platforms", "styles"), with_licenses=True, with_guide=True):
     py = root / "_internal" / "PySide6"
     (py / "plugins").mkdir(parents=True)
     for module in ("Core", "Gui", "Widgets", *extra_dlls):
@@ -20,11 +20,19 @@ def make_bundle(root: Path, extra_dlls=(), plugin_dirs=("platforms", "styles"), 
                      "resources/templates/cartpole_simulink/LICENSE-modele.txt"):
             (root / name).parent.mkdir(parents=True, exist_ok=True)
             (root / name).write_text("x")
+    if with_guide:
+        (root / "resources" / "docs").mkdir(parents=True, exist_ok=True)
+        (root / "resources" / "docs" / "guide.md").write_text("# Guide")
     return root
 
 
 def test_clean_bundle_passes(tmp_path):
     assert check_bundle.check(make_bundle(tmp_path)) == []
+
+
+def test_missing_user_guide_is_reported(tmp_path):
+    problems = check_bundle.check(make_bundle(tmp_path, with_guide=False))
+    assert any("resources/docs/guide.md" in p for p in problems)
 
 
 def test_virtual_keyboard_is_rejected(tmp_path):

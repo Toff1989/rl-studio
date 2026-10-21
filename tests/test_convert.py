@@ -86,6 +86,7 @@ def test_write_project_rejects_inconsistent_environment(tmp_path):
         convert.write_project(tmp_path, _spec(reward="-(zzz)**2"), result)
 
 
+@pytest.mark.gui
 def test_convert_dialog_builds_a_valid_spec_from_an_analysis(tmp_path):
     import os
 

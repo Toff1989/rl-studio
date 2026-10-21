@@ -99,13 +99,13 @@ def train(project: Project, on_episode=None, on_state=None, on_baseline=None, sh
             label = "politique du projet"
             if policy is None:
                 policy, label = (lambda obs: env.action_space.sample()), "politique aléatoire"
-            log(f"Évaluation de référence : {n_base} episode(s) avec la {label} (avant l'apprentissage).")
+            log(f"Évaluation de référence : {n_base} épisode(s) avec la {label} (avant l'apprentissage).")
             t_base = time.time()
             ep_steps = getattr(env, "n_steps", None)
 
             def base_episode(i, n, ret, duration):
                 left = (time.time() - t_base) / (i + 1) * (n - i - 1)
-                log(f"Reference {i + 1}/{n} | récompense {ret:.2f} | {fmt_duration(duration)}"
+                log(f"Référence {i + 1}/{n} | récompense {ret:.2f} | {fmt_duration(duration)}"
                     + (f" | reste ~{fmt_duration(left)}" if i + 1 < n else ""))
                 if on_progress:
                     on_progress("baseline", (i + 1) / n)

@@ -6,6 +6,8 @@ import sys
 
 import pytest
 
+pytestmark = pytest.mark.runtime
+
 from rlstudio.distill import DistillOptions, run_distillation
 from rlstudio.paths import TEMPLATES_DIR
 from rlstudio.project import ProjectStore
@@ -55,6 +57,7 @@ def test_cli_distill(trained):
     assert "usage" not in r.stderr.lower() or "unrecognized" not in r.stderr.lower()
 
 
+@pytest.mark.gui
 def test_distill_tab_loads_and_shows_report(trained, tmp_path):
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     from PySide6.QtWidgets import QApplication

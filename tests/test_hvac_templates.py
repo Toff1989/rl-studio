@@ -4,7 +4,9 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from gymnasium.utils.env_checker import check_env
+
+pytest.importorskip("gymnasium")
+from gymnasium.utils.env_checker import check_env  # noqa: E402
 
 TEMPLATES = Path(__file__).resolve().parents[1] / "templates"
 IDS = ["pac_zone", "ventilation_co2", "ballon_ecs"]

@@ -56,6 +56,7 @@ def derive(base: dict) -> dict:
         accent_rgb="{}, {}, {}".format(*_rgb(accent)),
         success_rgb="{}, {}, {}".format(*_rgb(t["success"])),
         danger_rgb="{}, {}, {}".format(*_rgb(t["danger"])),
+        warning_rgb="{}, {}, {}".format(*_rgb(t["warning"])),
         text_rgb="{}, {}, {}".format(*_rgb(text)),
     )
     return t
@@ -83,13 +84,16 @@ QLabel#hint { color: @muted; font-size: 12px; }
 QLabel#statusbox { background: @surface2; border-radius: 6px; padding: 8px 10px; color: @muted; }
 QLabel#statusbox[tone="ok"] { background: rgba(@success_rgb, 0.14); color: @success; }
 QLabel#statusbox[tone="bad"] { background: rgba(@danger_rgb, 0.14); color: @danger_text; }
+QFrame#errorBanner { background: rgba(@danger_rgb, 0.18); border-bottom: 1px solid @danger; }
+QFrame#errorBanner[level="warning"] { background: rgba(@warning_rgb, 0.18); border-bottom: 1px solid @warning; }
+QFrame#errorBanner QLabel { background: transparent; color: @text; }
 
 QFrame#card { background: @surface; border: 1px solid @border; border-radius: 10px; }
 QFrame#card QLabel { background: transparent; }
 
 QLineEdit, QPlainTextEdit, QSpinBox, QDoubleSpinBox, QComboBox {
     background: @surface2; border: 1px solid @border; border-radius: 6px;
-    padding: 6px 9px; sélection-background-color: @accent; sélection-color: @on_accent; }
+    padding: 6px 9px; selection-background-color: @accent; selection-color: @on_accent; }
 QLineEdit:focus, QPlainTextEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QComboBox:focus {
     border-color: @accent; }
 QPlainTextEdit#mono { font-family: Consolas, "Cascadia Mono", monospace; font-size: 12px; }
@@ -97,7 +101,7 @@ QSpinBox::up-button, QSpinBox::down-button, QDoubleSpinBox::up-button, QDoubleSp
     width: 0; border: none; }
 QComboBox::drop-down { border: none; width: 26px; }
 QComboBox QAbstractItemView { background: @surface2; border: 1px solid @border;
-    sélection-background-color: @accent; sélection-color: @on_accent; outline: 0; }
+    selection-background-color: @accent; selection-color: @on_accent; outline: 0; }
 
 QPushButton { background: @surface2; border: 1px solid @border; border-radius: 6px; padding: 7px 14px; }
 QPushButton:hover { border-color: @accent2; }
@@ -129,14 +133,14 @@ QListWidget::item:hover:!selected { background: rgba(@text_rgb, 0.06); }
 QListWidget#runs::item { padding: 8px 10px; margin: 2px 0; }
 
 QTableWidget { background: @surface; alternate-background-color: @alt_row; border: 1px solid @border;
-               border-radius: 6px; gridline-color: @border; sélection-background-color: rgba(@accent_rgb, 0.30);
-               sélection-color: @text; }
+               border-radius: 6px; gridline-color: @border; selection-background-color: rgba(@accent_rgb, 0.30);
+               selection-color: @text; }
 QTableWidget::item { padding: 4px 8px; }
 QHeaderView::section { background: @surface2; color: @muted; border: none;
                        border-bottom: 1px solid @border; padding: 6px 8px; font-weight: 600; }
 QTableCornerButton::section { background: @surface2; border: none; }
 QTreeWidget { background: @surface; border: 1px solid @border; border-radius: 6px;
-              sélection-background-color: rgba(@accent_rgb, 0.30); sélection-color: @text; outline: 0; }
+              selection-background-color: rgba(@accent_rgb, 0.30); selection-color: @text; outline: 0; }
 
 QScrollArea { background: transparent; border: none; }
 QScrollBar:vertical { background: transparent; width: 10px; margin: 0; }

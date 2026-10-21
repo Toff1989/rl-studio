@@ -1,6 +1,8 @@
 """Suivi detaille de l'entrainement : evaluation de reference observable, durees lisibles."""
-import gymnasium as gym
 import numpy as np
+import pytest
+
+gym = pytest.importorskip("gymnasium")
 
 from rlstudio.training import evaluate, fmt_duration
 

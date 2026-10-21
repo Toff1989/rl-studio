@@ -6,6 +6,24 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.4.1] - 2026-10-21
+
+### Ajouté
+- **Infobulles partout** : chaque bouton, champ, case, liste, tableau (en-têtes et cellules), graphique et onglet explique son rôle au survol — fenêtre principale, Paramètres, éditeur de thème, assistant de conversion Simulink et explorateur de blocs. Un test vérifie qu'aucun contrôle n'en est dépourvu.
+- **Guide d'utilisation** (`docs/guide.md`, embarqué dans l'installateur) : vocabulaire, démarrage en 5 minutes, description de chaque onglet et de chaque champ, conversion Simulink, partage, paramètres, dépannage. Accessible par **F1** (ouvert à la section de l'onglet affiché), le bouton *Guide d'utilisation* de la barre latérale ou *Paramètres → Guide d'utilisation* ; sommaire et recherche. Il reste consultable pendant un calcul.
+- **Bandeau d'erreurs** en haut de la fenêtre, visible quel que soit l'onglet, avec *Détails…* (texte complet, copie) : fin de calcul en échec (entraînement, extraction, identification, évaluation), ligne d'erreur écrite dans un journal, échec d'un export Simulink ou de la lecture des signaux, exception Python inattendue. La fenêtre d'installation des composants signale aussi les erreurs de sa sortie.
+- Avertissement (bandeau, ou stderr en ligne de commande) quand Python sort de la plage validée 3.10 à 3.12 (`rlstudio/pyversion.py`).
+
+### Modifié
+- **Textes accentués** : interface, messages du calcul, validations, erreurs d'import, modèles de projet fournis. Le nom d'un projet accentué donne un dossier lisible (`Régulation` → `regulation`). Le code MATLAB généré reste en ASCII (indépendant de l'encodage lu par MATLAB).
+- **`gui/app.py` découpé** (1 244 → environ 230 lignes) : un module par onglet (`tab_project`, `tab_env`, `tab_algo`, `tab_train`, `tab_runs`), les actions de projet (`project_actions`) et la table de spécification (`spec_table`). Aucun changement de comportement.
+- Tests : deux marqueurs, `runtime` (gymnasium, stable-baselines3, torch) et `gui` (PySide6, pyqtgraph). Sans ces paquets les tests concernés sont **ignorés avec la raison affichée** au lieu d'échouer.
+- README à jour : les huit modèles de projet, toutes les commandes (`distill`, `identify`), plage de Python, organisation des tests.
+
+### Corrigé
+- Une erreur écrite dans le journal d'un onglet n'apparaissait nulle part ailleurs : elle est maintenant remontée dans le bandeau.
+- Le contrôle du bundle (`check_bundle.py`) exige aussi le guide d'utilisation (ressource distincte des licences).
+
 ## [0.4.0] - 2026-10-20
 
 ### Ajouté

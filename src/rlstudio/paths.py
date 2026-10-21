@@ -3,7 +3,7 @@
 Disposition de l'application installee (identique au dossier `dist/rlstudio` du build) :
 
     rlstudio.exe, rlstudio-tools.exe   interface et outils console
-    resources/{templates,matlab}       modeles de projets et scripts MATLAB
+    resources/{templates,matlab,docs}  modeles de projets, scripts MATLAB et guide d'utilisation
     lib/rlstudio/                      code Python pur, utilise par le runtime de calcul
     vendor/                            Python embarqué, get-pip.py, requirements-runtime.txt
 """
@@ -18,6 +18,7 @@ APP_DIR = Path(sys.executable).resolve().parent if FROZEN else REPO_ROOT
 RESOURCE_DIR = Path(os.environ.get("RLSTUDIO_RESOURCES") or (APP_DIR / "resources" if FROZEN else REPO_ROOT))
 TEMPLATES_DIR = RESOURCE_DIR / "templates"
 MATLAB_DIR = RESOURCE_DIR / "matlab"
+GUIDE_FILE = RESOURCE_DIR / "docs" / "guide.md" if FROZEN else REPO_ROOT / "docs" / "guide.md"
 VENDOR_DIR = APP_DIR / "vendor" if FROZEN else REPO_ROOT / "packaging" / "vendor"
 ICON_FILE = RESOURCE_DIR / "icon.ico" if FROZEN else REPO_ROOT / "packaging" / "icon.ico"
 # mentions legales (copiees a cote de l'exe par build.ps1 ; a la racine du depot en developpement)

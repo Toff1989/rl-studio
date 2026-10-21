@@ -5,6 +5,8 @@ import time
 
 import pytest
 
+pytestmark = pytest.mark.gui
+
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 

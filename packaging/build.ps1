@@ -11,7 +11,7 @@
   python.org (Python embarque) et bootstrap.pypa.io (get-pip.py).
 #>
 param(
-  [string]$Version = "0.4.0",
+  [string]$Version = "0.4.1",
   [string]$PythonEmbedVersion = "3.12.10",   # derniere 3.12 avec binaires Windows
   [switch]$SkipVendor,
   [switch]$SkipInstaller
@@ -87,6 +87,8 @@ $app = "dist\rlstudio"
 New-Item -ItemType Directory -Force "$app\resources", "$app\lib", "$app\vendor" | Out-Null
 Copy-Item -Recurse -Force templates "$app\resources\templates"
 Copy-Item -Recurse -Force matlab "$app\resources\matlab"
+New-Item -ItemType Directory -Force "$app\resources\docs" | Out-Null
+Copy-Item docs\guide.md "$app\resources\docs\guide.md"
 Copy-Item packaging\icon.ico "$app\resources\icon.ico"
 # code Python pur vu par le runtime de calcul (sans l'interface)
 Copy-Item -Recurse -Force src\rlstudio "$app\lib\rlstudio"

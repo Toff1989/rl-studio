@@ -6,7 +6,7 @@ def validate_spec(spec: dict) -> list[str]:
     """Liste de problemes detectes dans la spec (vide si OK) ; utilise par la GUI."""
     errs = []
     if not spec.get("model"):
-        errs.append("Aucun modèle Simulink indique.")
+        errs.append("Aucun modèle Simulink indiqué.")
     if not spec.get("actions"):
         errs.append("Il faut au moins une action.")
     if not spec.get("observations"):

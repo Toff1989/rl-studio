@@ -17,16 +17,18 @@ from ..paths import LICENSE_FILE, LICENSES_DIR, LOGS_DIR, NOTICES_FILE, USER_DIR
 from ..settings import Settings
 from . import theme
 from .runner import ToolProcess, WorkerJob
-from .widgets import Card, button, label, scroll_page, column
+from .guide import GuideView
+from .notify import looks_like_error, summarize
+from .widgets import Card, button, column, label, scroll_page, tip, tips
 
 class ThemeEditor(QDialog):
-    """Edition d'un theme personnalise avec apercu en direct sur toute l'application."""
+    """Édition d'un thème personnalisé avec aperçu en direct sur toute l'application."""
 
     FONTS = ["Segoe UI", "Consolas", "Cascadia Mono", "Arial", "Verdana", "Georgia", "Trebuchet MS"]
 
     def __init__(self, parent, base, name, reserved, existing_custom, on_preview):
         super().__init__(parent)
-        self.setWindowTitle("Personnaliser le theme")
+        self.setWindowTitle("Personnaliser le thème")
         self.setMinimumWidth(440)
         self.reserved, self.existing_custom, self.on_preview = reserved, existing_custom, on_preview
         self.vals = {k: base[k] for k in theme.BASE_KEYS}
@@ -34,7 +36,7 @@ class ThemeEditor(QDialog):
         self.result_name = self.result_theme = None
 
         self.name_edit = QLineEdit(name)
-        self.name_edit.setPlaceholderText("Mon theme")
+        self.name_edit.setPlaceholderText("Mon thème")
         self.font_box = QComboBox()
         self.font_box.setEditable(True)
         self.font_box.addItems(self.FONTS)
@@ -44,7 +46,7 @@ class ThemeEditor(QDialog):
         form = QFormLayout()
         form.setHorizontalSpacing(18)
         form.setVerticalSpacing(10)
-        form.addRow("Nom du theme", self.name_edit)
+        form.addRow("Nom du thème", self.name_edit)
         self.swatches = {}
         for key in theme.BASE_KEYS:
             b = QPushButton()
@@ -55,19 +57,23 @@ class ThemeEditor(QDialog):
             self._paint(key)
             form.addRow(theme.BASE_LABELS[key], b)
         form.addRow("Police", self.font_box)
+        tips(self, {"name_edit": "Nom sous lequel le thème sera enregistré (différent de Sombre, Clair et Matrix).",
+                    "font_box": "Police de toute l'application. Vous pouvez saisir le nom d'une police installée sur votre ordinateur."})
+        for key, b in self.swatches.items():
+            b.setToolTip(f"Cliquez pour choisir la couleur « {theme.BASE_LABELS[key]} » ; l'aperçu est immédiat sur toute la fenêtre.")
 
         self.msg = label("", "hint", wrap=True)
         btns = QHBoxLayout()
-        self.btn_delete = button("Supprimer ce theme", "danger", self._delete)
+        self.btn_delete = button("Supprimer ce thème", "danger", self._delete, tip="Supprime ce thème personnalisé et revient au thème Sombre.")
         self.btn_delete.setVisible(name in existing_custom)
         btns.addWidget(self.btn_delete)
         btns.addStretch()
-        btns.addWidget(button("Annuler", "ghost", self.reject))
-        btns.addWidget(button("Enregistrer", "primary", self._accept))
+        btns.addWidget(button("Annuler", "ghost", self.reject, tip="Abandonne les modifications du thème."))
+        btns.addWidget(button("Enregistrer", "primary", self._accept, tip="Enregistre ce thème et l'applique."))
         lay = QVBoxLayout(self)
         lay.setContentsMargins(22, 20, 22, 18)
         lay.setSpacing(14)
-        lay.addWidget(label("Personnaliser le theme", "cardTitle"))
+        lay.addWidget(label("Personnaliser le thème", "cardTitle"))
         lay.addWidget(label("Les changements s'appliquent en direct. Les nuances (bordures, texte atténué...) "
                             "sont déduites des couleurs choisies.", "hint", wrap=True))
         lay.addLayout(form)
@@ -96,7 +102,7 @@ class ThemeEditor(QDialog):
     def _accept(self):
         name = self.name_edit.text().strip()
         if not name:
-            self.msg.setText("Donne un nom au theme.")
+            self.msg.setText("Donne un nom au thème.")
             return
         if name in self.reserved:
             self.msg.setText(f"« {name} » est un thème intégré : choisis un autre nom.")
@@ -118,19 +124,21 @@ class _Scanner(QObject):
 
 
 class LogDialog(QDialog):
-    """Execute un outil console et affiche sa sortie en direct."""
+    """Exécute un outil console et affiche sa sortie en direct."""
 
     def __init__(self, parent, title, args):
         super().__init__(parent)
         self.setWindowTitle(title)
         self.resize(780, 520)
         self.code = None
-        self.status = label("Exécution en cours...", "muted")
+        self.status = label("Exécution en cours...", "muted", wrap=True)
         self.out = QPlainTextEdit()
         self.out.setObjectName("mono")
         self.out.setReadOnly(True)
-        self.btn_close = button("Fermer", "primary", self.accept)
+        self.btn_close = button("Fermer", "primary", self.accept, tip="Disponible une fois l'opération terminée (elle ne peut pas être interrompue).")
         self.btn_close.setEnabled(False)
+        self.out.setToolTip("Sortie détaillée de l'opération en cours.")
+        self._problems = []
         lay = QVBoxLayout(self)
         lay.setContentsMargins(20, 18, 20, 18)
         lay.setSpacing(10)
@@ -142,16 +150,30 @@ class LogDialog(QDialog):
         row.addWidget(self.btn_close)
         lay.addLayout(row)
         self.proc = ToolProcess(args, self)
-        self.proc.line.connect(self.out.appendPlainText)
+        self.proc.line.connect(self._on_line)
         self.proc.finished.connect(self._finished)
 
     def start(self):
         self.proc.start()
 
+    def _on_line(self, line):
+        self.out.appendPlainText(line)
+        if looks_like_error(line):
+            self._problems.append(line)
+
     def _finished(self, code):
         self.code = code
         self.btn_close.setEnabled(True)
-        self.status.setText("Terminé." if code == 0 else f"Terminé avec des avertissements ou des erreurs (code {code}).")
+        if code == 0 and not self._problems:
+            self.status.setText("Terminé.")
+            return
+        # une erreur écrite dans la sortie ne doit pas passer inaperçue : on la remonte au-dessus du journal
+        problem = summarize(self._problems[-1]) if self._problems else f"code de sortie {code}"
+        self.status.setText(f"Terminé avec des avertissements ou des erreurs (code {code}) : {problem}")
+        self.status.setObjectName("statusbox")
+        self.status.setProperty("tone", "bad")
+        self.status.style().unpolish(self.status)
+        self.status.style().polish(self.status)
 
     def reject(self):
         if self.code is None:
@@ -159,7 +181,16 @@ class LogDialog(QDialog):
         super().reject()
 
 
-PAGES = ["Apparence", "Général", "MATLAB / Simulink", "Calcul (CPU / GPU)", "Composants", "À propos"]
+PAGES = ["Apparence", "Général", "MATLAB / Simulink", "Calcul (CPU / GPU)", "Composants", "Guide d'utilisation", "À propos"]
+PAGE_TIPS = [
+    "Thème de couleurs de l'application.",
+    "Dossier des projets et dossier des données de l'application.",
+    "Choix de l'installation de MATLAB utilisée pour les projets Simulink.",
+    "Utilisation de la carte graphique NVIDIA pour l'entraînement.",
+    "Python, PyTorch et MATLAB Engine : ce qui exécute les calculs.",
+    "Mode d'emploi de RL Studio, avec recherche.",
+    "Version, emplacements des fichiers et licences.",
+]
 
 
 class SettingsDialog(QDialog):
@@ -176,19 +207,22 @@ class SettingsDialog(QDialog):
 
         self.nav = QListWidget()
         self.nav.setFixedWidth(210)
+        self.nav.setToolTip("Catégories de paramètres.")
         self.nav.addItems(PAGES)
+        for i, text in enumerate(PAGE_TIPS):
+            self.nav.item(i).setToolTip(text)
         self.nav.setStyleSheet("QListWidget::item { padding: 9px 12px; }")
         self.stack = QStackedWidget()
         for build in (self._page_appearance, self._page_general, self._page_matlab, self._page_compute,
-                      self._page_components, self._page_about):
+                      self._page_components, self._page_guide, self._page_about):
             self.stack.addWidget(build())
         self.nav.currentRowChanged.connect(self.stack.setCurrentIndex)
         self.nav.setCurrentRow(0)
 
-        self.btn_ok = button("OK", "primary", self._ok)
+        self.btn_ok = button("OK", "primary", self._ok, tip="Enregistre les paramètres et ferme la fenêtre.")
         btns = QHBoxLayout()
         btns.addStretch()
-        btns.addWidget(button("Annuler", "ghost", self.reject))
+        btns.addWidget(button("Annuler", "ghost", self.reject, tip="Ferme la fenêtre sans enregistrer (le thème revient à celui d'avant)."))
         btns.addWidget(self.btn_ok)
         body = QHBoxLayout()
         body.setSpacing(0)
@@ -208,10 +242,11 @@ class SettingsDialog(QDialog):
         self.theme_combo = QComboBox()
         self._fill_themes()
         self.theme_combo.currentTextChanged.connect(lambda n: n and self.apply_theme(n))
-        card = Card("Theme", "Le theme s'applique immédiatement ; Annuler revient au theme précédent.")
+        card = Card("Thème", "Le thème s'applique immédiatement ; Annuler revient au thème précédent.")
         row = QHBoxLayout()
-        row.addWidget(self.theme_combo, 1)
-        row.addWidget(button("Personnaliser...", None, self._edit_theme))
+        row.addWidget(tip(self.theme_combo, "Thème de couleurs : Sombre, Clair, Matrix, ou un thème que vous avez créé."), 1)
+        row.addWidget(button("Personnaliser...", None, self._edit_theme,
+                             tip="Crée ou modifie un thème : choix des couleurs et de la police, avec aperçu en direct."))
         card.body.addLayout(row)
         return scroll_page(column(card), 720)
 
@@ -246,13 +281,14 @@ class SettingsDialog(QDialog):
         self.projects_edit = QLineEdit(str(self.settings.projects_dir))
         card = Card("Dossier des projets", "Chaque projet est un dossier contenant sa configuration, son environnement et ses résultats.")
         row = QHBoxLayout()
-        row.addWidget(self.projects_edit, 1)
-        row.addWidget(button("Parcourir...", None, self._browse_projects))
-        row.addWidget(button("Ouvrir", "ghost", lambda: self._open(self.projects_edit.text())))
+        row.addWidget(tip(self.projects_edit, "Dossier qui contient un sous-dossier par projet. Le changer ne déplace pas les projets existants."), 1)
+        row.addWidget(button("Parcourir...", None, self._browse_projects, tip="Choisit le dossier des projets."))
+        row.addWidget(button("Ouvrir", "ghost", lambda: self._open(self.projects_edit.text()), tip="Affiche ce dossier dans l'Explorateur de fichiers."))
         card.body.addLayout(row)
         data = Card("Données de l'application", "Réglages, composants de calcul et journaux (propres à chaque utilisateur).")
         data.body.addWidget(label(str(USER_DIR), "muted"))
-        data.body.addLayout(self._row(button("Ouvrir le dossier", None, lambda: self._open(USER_DIR))))
+        data.body.addLayout(self._row(button("Ouvrir le dossier", None, lambda: self._open(USER_DIR),
+                                             tip="Affiche le dossier des réglages, des composants de calcul et des journaux.")))
         return scroll_page(column(card, data), 720)
 
     def _page_matlab(self):
@@ -266,17 +302,27 @@ class SettingsDialog(QDialog):
         self.ml_test = label("", "statusbox", wrap=True)
         self.ml_test.hide()
         install = Card("Installation de MATLAB", "Choisis l'installation à utiliser ; les fichiers du Engine Python doivent être présents.")
+        tips(self, {
+            "ml_enabled": "Décochez pour travailler sans MATLAB : les projets Simulink ne pourront alors pas être entraînés.",
+            "ml_combo": "Installations de MATLAB trouvées sur cet ordinateur. « Détection automatique » prend la plus récente et complète.",
+            "ml_path": "Dossier d'installation de MATLAB (ex. C:/Program Files/MATLAB/R2026b). Vide = détection automatique.",
+            "ml_info": "Version détectée, présence de Simulink et versions de Python acceptées par MATLAB Engine.",
+            "ml_test": "Résultat du test de démarrage de MATLAB.",
+        })
         install.body.addWidget(self.ml_enabled)
         install.body.addWidget(self.ml_combo)
         row = QHBoxLayout()
         row.addWidget(self.ml_path, 1)
-        row.addWidget(button("Parcourir...", None, self._browse_matlab))
+        row.addWidget(button("Parcourir...", None, self._browse_matlab, tip="Choisit manuellement le dossier d'installation de MATLAB."))
         install.body.addLayout(row)
         install.body.addWidget(self.ml_info)
-        install.body.addLayout(self._row(button("Détecter à nouveau", None, self._rescan),
-                                         button("Tester MATLAB", "primary", self._test_matlab)))
+        install.body.addLayout(self._row(button("Détecter à nouveau", None, self._rescan,
+                                                tip="Relance la recherche des installations de MATLAB et de la carte graphique."),
+                                         button("Tester MATLAB", "primary", self._test_matlab,
+                                                tip="Démarre MATLAB pour vérifier qu'il fonctionne et que la licence Simulink est valide (jusqu'à 30 s).")))
         install.body.addWidget(self.ml_test)
         self.ml_engine = label("", "hint", wrap=True)
+        self.ml_engine.setToolTip("Le MATLAB Engine est le pont qui permet à Python de piloter MATLAB et Simulink.")
         engine = Card("MATLAB Engine pour Python", "Installe automatiquement dans les composants de calcul, avec la version qui correspond à ton MATLAB.")
         engine.body.addWidget(self.ml_engine)
         self._fill_matlab_combo()
@@ -288,10 +334,16 @@ class SettingsDialog(QDialog):
         self.gpu_info = label("", wrap=True)
         self.torch_info = label("", "hint", wrap=True)
         gpu = Card("Accélération GPU", "Si désactivé, tous les entraînements tournent sur CPU. Pour un projet, 'auto' choisit le GPU quand il est disponible.")
+        tips(self, {
+            "gpu_enabled": "Autorise l'entraînement sur la carte graphique NVIDIA pour les projets réglés sur « cuda » ou « auto ». Décoché : tout tourne sur le processeur.",
+            "gpu_info": "Carte graphique NVIDIA détectée, pilote et version de CUDA prise en charge.",
+            "torch_info": "Version de PyTorch installée et utilisabilité du GPU.",
+        })
         gpu.body.addWidget(self.gpu_enabled)
         gpu.body.addWidget(self.gpu_info)
         gpu.body.addWidget(self.torch_info)
-        gpu.body.addLayout(self._row(button("Scanner le matériel", None, self._rescan)))
+        gpu.body.addLayout(self._row(button("Scanner le matériel", None, self._rescan,
+                                            tip="Détecte à nouveau la carte graphique, la mémoire et les installations de MATLAB.")))
         return scroll_page(column(gpu), 720)
 
     def _page_components(self):
@@ -300,18 +352,33 @@ class SettingsDialog(QDialog):
         self.rt_manual = QLineEdit(self.settings.get("python_runtime") or "")
         self.rt_manual.setPlaceholderText("Automatique (composants installés par l'application)")
         card = Card("Composants de calcul", "Python, PyTorch et MATLAB Engine : ce qui exécute les entraînements. L'installation choisit les versions adaptées à ton matériel.")
+        tips(self, {
+            "rt_status": "Les composants de calcul sont-ils prêts ? Sinon, utilisez « Installer / réparer ».",
+            "rt_versions": "Versions de Python, PyTorch, Stable-Baselines3 et Gymnasium trouvées dans les composants de calcul.",
+            "rt_manual": "Avancé : chemin d'un python.exe à utiliser à la place des composants installés par l'application (ex. un environnement de développement). Vide = automatique.",
+        })
         card.body.addWidget(self.rt_status)
         card.body.addWidget(self.rt_versions)
-        card.body.addLayout(self._row(button("Installer / réparer les composants...", "primary", self._provision),
-                                      button("Vérifier", None, self._refresh_env_info)))
+        card.body.addLayout(self._row(button("Installer / réparer les composants...", "primary", self._provision,
+                                             tip="Installe ou répare Python, PyTorch (version adaptée à votre carte graphique) et MATLAB Engine. Nécessite une connexion Internet."),
+                                      button("Vérifier", None, self._refresh_env_info, tip="Relit les versions installées.")))
         manual = Card("Python de calcul personnalisé (avancé)", "Remplace le runtime installé par un autre interpréteur Python (ex. un venv de développement).")
         row = QHBoxLayout()
         row.addWidget(self.rt_manual, 1)
-        row.addWidget(button("Parcourir...", None, self._browse_python))
+        row.addWidget(button("Parcourir...", None, self._browse_python, tip="Choisit un interpréteur Python (python.exe)."))
         manual.body.addLayout(row)
         logs = Card("Journaux")
-        logs.body.addLayout(self._row(button("Ouvrir le dossier des journaux", None, lambda: self._open(LOGS_DIR))))
+        logs.body.addLayout(self._row(button("Ouvrir le dossier des journaux", None, lambda: self._open(LOGS_DIR),
+                                             tip="Affiche les fichiers journaux détaillés (utiles pour comprendre un problème d'installation).")))
         return scroll_page(column(card, manual, logs), 720)
+
+    def _page_guide(self):
+        self.guide_view = GuideView()
+        holder = QWidget()
+        lay = QVBoxLayout(holder)
+        lay.setContentsMargins(20, 18, 20, 8)
+        lay.addWidget(self.guide_view)
+        return holder
 
     def _page_about(self):
         from .. import __version__
@@ -331,11 +398,11 @@ class SettingsDialog(QDialog):
         qt.setTextFormat(Qt.RichText)
         legal.body.addWidget(qt)
         legal.body.addLayout(self._row(
-            button("Licence de RL Studio", None, lambda: self._open(LICENSE_FILE)),
-            button("Composants tiers", None, lambda: self._open(NOTICES_FILE)),
-            button("Textes des licences (LGPL, GPL)", None, lambda: self._open(LICENSES_DIR)),
+            button("Licence de RL Studio", None, lambda: self._open(LICENSE_FILE), tip="Ouvre le texte de la licence MIT de RL Studio."),
+            button("Composants tiers", None, lambda: self._open(NOTICES_FILE), tip="Ouvre la liste des composants tiers et de leurs licences."),
+            button("Textes des licences (LGPL, GPL)", None, lambda: self._open(LICENSES_DIR), tip="Ouvre le dossier des textes complets des licences."),
             button("Sources de Qt", None, lambda: QDesktopServices.openUrl(
-                QUrl("https://download.qt.io/archive/qt/6.8/6.8.3/single/")))))
+                QUrl("https://download.qt.io/archive/qt/6.8/6.8.3/single/")), tip="Ouvre dans le navigateur la page de téléchargement du code source de Qt.")))
         return scroll_page(column(card, legal), 720)
 
     @staticmethod
@@ -398,7 +465,7 @@ class SettingsDialog(QDialog):
             self.ml_info.setText("Aucune installation MATLAB valide trouvée à cet emplacement.")
             return
         py = ", ".join(m.get("engine_python_versions") or []) or "inconnu"
-        ok = "complete" if m.get("complete") else "INCOMPLETE (matlab.exe ou Engine Python manquant)"
+        ok = "complète" if m.get("complete") else "INCOMPLÈTE (matlab.exe ou Engine Python manquant)"
         self.ml_info.setText(f"{m.get('release') or '?'} - version {m.get('version')} - installation {ok}. "
                              f"Simulink : {'oui' if m.get('simulink') else 'non'}. Python supporté par l'Engine : {py}.")
 
@@ -423,7 +490,7 @@ class SettingsDialog(QDialog):
                                   f"CUDA max du pilote : {self.hw.get('cuda_driver') or 'inconnu'}")
         else:
             self.gpu_info.setText("Aucune carte NVIDIA détectée : les entraînements utiliseront le CPU." if self.hw
-                                  else "Matériel non scanne : clique sur « Scanner le matériel ».")
+                                  else "Matériel non scanné : clique sur « Scanner le matériel ».")
 
     def _refresh_env_info(self):
         self.rt_status.setText(runtime.status(self.settings)["message"])
@@ -439,7 +506,7 @@ class SettingsDialog(QDialog):
             self.ml_engine.setText("État inconnu (composants de calcul indisponibles).")
             return
         self.env_info = res
-        yes = lambda v: v or "non installe"  # noqa: E731
+        yes = lambda v: v or "non installé"  # noqa: E731
         self.rt_versions.setText(
             f"Python {res.get('python')}  -  PyTorch {yes(res.get('torch'))}  -  Stable-Baselines3 {yes(res.get('stable_baselines3'))}"
             f"  -  Gymnasium {yes(res.get('gymnasium'))}")
@@ -448,9 +515,9 @@ class SettingsDialog(QDialog):
                 else "PyTorch est en version CPU (ou aucun GPU utilisable)."
             self.torch_info.setText(f"PyTorch {res['torch']}. {gpu}")
         else:
-            self.torch_info.setText("PyTorch n'est pas installe.")
-        self.ml_engine.setText(f"matlabengine {res['matlabengine']} installe." if res.get("matlabengine")
-                               else "matlabengine n'est pas installe dans les composants de calcul.")
+            self.torch_info.setText("PyTorch n'est pas installé.")
+        self.ml_engine.setText(f"matlabengine {res['matlabengine']} installé." if res.get("matlabengine")
+                               else "matlabengine n'est pas installé dans les composants de calcul.")
 
     def _test_matlab(self):
         self._apply_to_settings()

@@ -7,15 +7,17 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QGridLayout, QHBoxLayout, Q
 
 from ..evaluation import policy_choices
 from .live_plots import SeriesPlot
+from .notify import looks_like_error, summarize
 from .runner import EvalRunner, RuntimeMissing
 from .theme import C
-from .widgets import Card, Kpi, button, fmt_run_date, label
+from .widgets import Card, Kpi, button, fmt_run_date, label, tips
 
 SPEEDS = [("Maximale", 0.0), ("Rapide (100 pas/s)", 0.01), ("Normale (30 pas/s)", 0.033), ("Lente (10 pas/s)", 0.1)]
 
 
 class EvalTab(QWidget):
     busy = Signal(bool)
+    error = Signal(str, str)  # (résumé, détail) : une erreur à montrer dans le bandeau de la fenêtre principale
 
     def __init__(self, settings, parent=None):
         super().__init__(parent)
@@ -84,6 +86,26 @@ class EvalTab(QWidget):
         self.logbox.setReadOnly(True)
         self.logbox.setMaximumBlockCount(5000)  # journal borne : il ne ralentit pas l'affichage
         self.logbox.setFixedHeight(80)
+        tips(self, {
+            "run_combo": "Entraînement à rejouer (seuls ceux qui ont un modèle enregistré sont proposés).",
+            "policy_combo": "Qui pilote le système : l'agent entraîné, ou un modèle mathématique extrait de cet entraînement (onglet Modèle mathématique).",
+            "f_episodes": "Nombre d'épisodes (essais complets) à rejouer.",
+            "f_seed": "Fixe les situations de départ : la même graine redonne les mêmes départs, ce qui permet de comparer deux politiques sur les mêmes cas.",
+            "speed": "Vitesse de la lecture. « Maximale » va le plus vite possible ; les vitesses plus lentes permettent de suivre les courbes en direct.",
+            "btn_start": "Rejoue les épisodes avec la politique choisie (sans bruit d'exploration) et trace les courbes en direct.",
+            "btn_stop": "Interrompt l'évaluation en cours.",
+            "status": "État de l'évaluation.",
+            "k_ep": "Épisode en cours sur le nombre demandé.",
+            "k_step": "Numéro du pas dans l'épisode en cours.",
+            "k_ret": "Somme des récompenses de l'épisode en cours.",
+            "k_mean": "Moyenne des retours des épisodes terminés.",
+            "p_obs": "Observations (ce que l'agent voit) pendant l'épisode en cours. Cliquez sur la légende pour masquer ou afficher une courbe.",
+            "p_act": "Actions (ce que l'agent commande) pendant l'épisode en cours. Cliquez sur la légende pour masquer ou afficher une courbe.",
+            "p_cum": "Récompense cumulée depuis le début de l'épisode en cours.",
+            "p_ret": "Retour (somme des récompenses) de chaque épisode terminé.",
+            "chk_norm": "Ramène chaque signal à l'échelle 0–1 pour comparer des grandeurs très différentes.",
+            "logbox": "Un résumé par épisode terminé. Les erreurs s'affichent aussi dans le bandeau en haut de la fenêtre.",
+        })
 
         lay = QVBoxLayout(self)
         lay.setContentsMargins(28, 20, 28, 20)
@@ -154,7 +176,7 @@ class EvalTab(QWidget):
             self.runner.meta.connect(self._on_meta)
             self.runner.step.connect(self._on_step)
             self.runner.episode_done.connect(self._on_episode)
-            self.runner.log.connect(self.logbox.appendPlainText)
+            self.runner.log.connect(self._on_log)
             self.runner.finished.connect(self._on_finished)
             self.runner.start()
         except RuntimeMissing as e:
@@ -192,8 +214,13 @@ class EvalTab(QWidget):
         self.returns.append(ev["reward"])
         self.bars.setOpts(x=np.arange(1, len(self.returns) + 1), height=self.returns)
         self.k_mean.set(f"{np.mean(self.returns):.2f}")
-        self.logbox.appendPlainText(f"Episode {ev['n']} : retour {ev['reward']:.3f}, {ev['length']} pas"
+        self.logbox.appendPlainText(f"Épisode {ev['n']} : retour {ev['reward']:.3f}, {ev['length']} pas"
                                     + (" (arrêt anticipé)" if ev.get("terminated") else ""))
+
+    def _on_log(self, text):
+        self.logbox.appendPlainText(text.rstrip())
+        if looks_like_error(text):
+            self.error.emit(summarize(text), text)
 
     def _on_finished(self, message):
         self.runner = None
@@ -201,5 +228,9 @@ class EvalTab(QWidget):
             w.setEnabled(True)
         self.btn_stop.setEnabled(False)
         self.busy.emit(False)
-        self.status.setText(message[:400] if message.startswith("ERREUR") else
-                            "Évaluation terminée." if message.startswith("Terminé") else "Évaluation arrêtée.")
+        if message.startswith("ERREUR"):
+            self.logbox.appendPlainText(message)
+            self.status.setText("Échec de l'évaluation : " + summarize(message))
+            self.error.emit("Échec de l'évaluation : " + summarize(message), message)
+        else:
+            self.status.setText("Évaluation terminée." if message.startswith("Terminé") else "Évaluation arrêtée.")

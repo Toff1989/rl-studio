@@ -1,5 +1,9 @@
-from rlstudio.gui import theme
-from rlstudio.settings import Settings
+import pytest
+
+pytest.importorskip("PySide6")
+pytest.importorskip("pyqtgraph")
+from rlstudio.gui import theme  # noqa: E402
+from rlstudio.settings import Settings  # noqa: E402
 
 
 def test_derive_fills_all_tokens_for_every_builtin_theme():

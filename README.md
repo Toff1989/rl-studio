@@ -9,9 +9,9 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.4.0-4f7cf0">
+  <img alt="version" src="https://img.shields.io/badge/version-0.4.1-4f7cf0">
   <img alt="licence MIT" src="https://img.shields.io/badge/licence-MIT-3ecf8e">
-  <img alt="Python 3.12" src="https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white">
+  <img alt="Python 3.10 à 3.12" src="https://img.shields.io/badge/python-3.10%20%E2%80%93%203.12-3776AB?logo=python&logoColor=white">
   <img alt="Windows" src="https://img.shields.io/badge/plateforme-Windows-0078D6?logo=windows&logoColor=white">
   <br>
   <img alt="Qt PySide6" src="https://img.shields.io/badge/Qt%20(PySide6)-6.8%20%C2%B7%20LGPLv3-41CD52?logo=qt&logoColor=white">
@@ -27,18 +27,25 @@
 - **Deux types d'environnements** : Python (`gymnasium.Env`) ou modèle Simulink décrit sans code (signaux, paramètres, récompense).
 - **Conversion d'un modèle Simulink existant** : le bouton *Convertir un modèle Simulink…* (barre latérale) analyse un `.slx`, propose entrées → actions et sorties → observations, puis crée un projet avec une **copie** adaptée du modèle (l'original n'est jamais modifié) et la teste à vide.
 - **Partage** : export/import de projets en un seul fichier **`.rls`** (double-clic ou glisser-déposer).
-- **Entraînement** en direct (récompense, observation, actions) avec comparaison à une politique de référence.
+- **Entraînement** en direct (récompense, observation, actions) avec comparaison à une politique de référence ; algorithmes SAC, PPO et TD3.
+- **Évaluation** : rejeu d'un entraînement (ou d'un modèle mathématique extrait) avec courbes en direct, plusieurs épisodes, graine et vitesse au choix.
 - **Modèle mathématique** : extraction de la politique apprise sous forme de PID, table de gains, arbre de décision ou équation, validée en boucle fermée, exportable en Python / MATLAB / Simulink ([détails](docs/distillation.md)).
 - **Identification sans politique** (`rlstudio identify`) : balayage d'un modèle Simulink ou Python → carte entrées → sorties **en régime permanent** (défaut) ou dynamique `x(k+1) = x + f(x, u)` ; modèle réduit (linéaire, polynôme, équations parcimonieuses SINDy, réseau de neurones) validé en simulation libre, exportable en Python / MATLAB ([détails](docs/identification.md)).
+- **Aide intégrée pour débuter** : une infobulle sur chaque bouton, champ, colonne de tableau et graphique, et un **guide d'utilisation** (touche **F1**, bouton *Guide d'utilisation* de la barre latérale, ou *Paramètres → Guide d'utilisation*) avec sommaire et recherche, ouvert à la section de l'onglet affiché ([docs/guide.md](docs/guide.md)).
+- **Erreurs toujours visibles** : toute erreur (fin de calcul en échec, ligne d'erreur du journal, exception inattendue) s'affiche aussi dans un bandeau en haut de la fenêtre, avec un bouton *Détails…* (texte complet, copie).
 - **Installateur Windows** qui détecte le matériel (GPU NVIDIA, MATLAB) et installe les composants adaptés.
 - **Thèmes** Sombre, Clair, Matrix et personnalisables ; tous les réglages généraux dans la fenêtre *Paramètres*.
 
 ```
 projects/<projet>/        un dossier par projet : project.yaml, env.py / model.slx, runs/
-templates/                modèles de départ : python_blank, cartpole, simulink_blank, cartpole_simulink
-matlab/                   rlstudio_step.m (simulation pas à pas), rlstudio_inspect.m (explorateur)
-src/rlstudio/             project.py, archive.py (.rls), envs/, training.py, worker.py, components.py, hardware.py, gui/
+templates/                huit modèles de départ (voir plus bas)
+matlab/                   rlstudio_step.m (simulation pas à pas), rlstudio_inspect.m (explorateur), conversion de modèles
+docs/                     guide d'utilisation, distillation, identification, notes de version
+src/rlstudio/             project.py, archive.py (.rls), envs/, training.py, worker.py, distill/, identify/, components.py, hardware.py
+src/rlstudio/gui/         app.py (fenêtre), tab_*.py (un module par onglet), project_actions.py, distill_tab.py, identify_tab.py,
+                          eval_tab.py, guide.py, notify.py (bandeau d'erreurs), settings_dialog.py, convert_dialog.py
 packaging/                PyInstaller + Inno Setup : voir packaging/README.md
+tests/                    pytest : voir « Développement »
 ```
 
 ## Application installée (Windows)
@@ -49,7 +56,23 @@ généraux sont dans la fenêtre **Paramètres** (apparence, dossier des projets
 Il associe aussi les fichiers `.rls` à l'application.
 Détails d'architecture et de build : [packaging/README.md](packaging/README.md).
 
+## Modèles de projet fournis
+
+| Modèle | Type | Contenu |
+|---|---|---|
+| `python_blank` | Python | Environnement Gymnasium vide à compléter dans `env.py` |
+| `simulink_blank` | Simulink | Projet Simulink vide : on déclare signaux, paramètres et récompense |
+| `cartpole` | Python | Pendule inverse sur chariot (exemple classique) |
+| `cartpole_simulink` | Simulink | Pendule inverse modélisé dans Simulink (modèle MIT de Jitendra Singh, adapté) |
+| `pac_zone` | Python | Pompe à chaleur air/eau : régulation d'une zone (modèle RC, COP selon la météo) |
+| `ventilation_co2` | Python | Ventilation à la demande : tenir le CO₂ sous 1000 ppm au moindre coût |
+| `ballon_ecs` | Python | Ballon d'eau chaude : tarif heures pleines/creuses et photovoltaïque |
+| `usine_identification` | Python | Banc d'essai de l'onglet Identification (2 entrées, 2 sorties non linéaires) |
+
 ## Développement
+
+Python **3.10 à 3.12** (3.12 recommandé : c'est le Python embarqué de l'installateur). Une autre version affiche un avertissement
+(`rlstudio/pyversion.py` est la source unique de cette plage, alignée sur `requires-python`).
 
 ```powershell
 python -m venv .venv                      # Python 3.12
@@ -61,11 +84,20 @@ pip install -e ".[matlab]"                # seulement pour les projets Simulink
 
 ```powershell
 rlstudio-gui                                  # interface graphique
-rlstudio list | templates | new | train | delete | export | import
+rlstudio list | templates | new | train | distill | identify | delete | export | import
 python -m rlstudio.launcher --scan            # détection du matériel
 python -m rlstudio.launcher --provision --dry-run   # plan d'installation des composants
 pytest
 ```
+
+`rlstudio distill <projet>` extrait un modèle mathématique d'un entraînement ; `rlstudio identify <projet>` identifie un modèle réduit
+sans politique (`--mode steady|dynamic`). `rlstudio <commande> --help` détaille les options.
+
+**Tests.** Le noyau (numpy, pyyaml) suffit à la plupart des tests. Les tests qui ont besoin de plus portent un marqueur et sont
+**ignorés avec la raison affichée** quand les paquets manquent, au lieu d'échouer : `runtime` (gymnasium, stable-baselines3, torch :
+entraînement, extraction, évaluation) et `gui` (PySide6, pyqtgraph : fenêtres et graphiques). `pip install -e ".[gui,runtime,dev]"`
+(avec PyTorch) exécute tout ; `pytest -m "not gui and not runtime"` lance le seul noyau. Sous Linux sans écran :
+`QT_QPA_PLATFORM=offscreen pytest`.
 
 En développement, l'interpréteur de calcul est celui du `.venv` ; dans l'application installée, c'est le runtime
 de `%LOCALAPPDATA%\RLStudio\runtime` (ou un Python choisi dans Paramètres > Composants).

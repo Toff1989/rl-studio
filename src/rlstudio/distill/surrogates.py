@@ -780,7 +780,7 @@ class NeuralSurrogate(Surrogate):
     def equations(self):
         sizes = [self.layers[0][0].shape[1]] + [W.shape[0] for W, _, _ in self.layers]
         acts = [a for _, _, a in self.layers]
-        return [f"reseau {' -> '.join(map(str, sizes))} ({self.complexity} paramètres), activations : {', '.join(acts)}",
+        return [f"réseau {' -> '.join(map(str, sizes))} ({self.complexity} paramètres), activations : {', '.join(acts)}",
                 ("sortie = low + 0.5*(tanh(z)+1)*(high-low)" if self.squash else "sortie = z, bornée à [low, high]"),
                 "(formule explicite dans les fichiers exportés : politique opaque, à distiller pour comprendre)"]
 

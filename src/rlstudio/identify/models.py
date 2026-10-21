@@ -351,7 +351,7 @@ class NeuralDynModel(DynModel):
         return f"{self.label} {'-'.join(map(str, sizes))}"
 
     def equations(self):
-        return [f"reseau {self.title().split()[-1]} ({self.complexity} paramètres), activations tanh puis sortie linéaire",
+        return [f"réseau {self.title().split()[-1]} ({self.complexity} paramètres), activations tanh puis sortie linéaire",
                 ("y = " if self.static else "x(k+1) = x(k) + ") + "DSD .* ( Wn.tanh(...tanh(W1.((z - MU)/SD) + b1)...) + bn )",
                 "(formule explicite dans les fichiers exportés ; modèle opaque, à utiliser comme modèle réduit numérique)"]
 

@@ -154,7 +154,7 @@ def _run(project, run_dir, opts, env, log, progress, should_stop):
                  "equations": eqs[:60] + (["..."] if len(eqs) > 60 else [])}
         entry["files"] = export.write_candidate(export.distill_dir(run_dir) / cand_id, sur)
         candidates.append(entry)
-        log(f"  {cand_id:14s} complexite {entry['complexity']:6d}  R2 {r2_exp:6.3f}  retour {entry['return_mean']:9.3f}  score {entry['score']:6.3f}")
+        log(f"  {cand_id:14s} complexité {entry['complexity']:6d}  R2 {r2_exp:6.3f}  retour {entry['return_mean']:9.3f}  score {entry['score']:6.3f}")
 
     for family in families:
         if should_stop and should_stop():
@@ -166,7 +166,7 @@ def _run(project, run_dir, opts, env, log, progress, should_stop):
             continue
         data = base
         if opts.dagger_iters > 0:
-            log(f"  DAgger : {opts.dagger_iters} tour(s) de {opts.dagger_episodes} episode(s)")
+            log(f"  DAgger : {opts.dagger_iters} tour(s) de {opts.dagger_episodes} épisode(s)")
             data, _ = collect.run_dagger(env, expert, fit_for_dagger[family], base, opts.dagger_iters, opts.dagger_episodes,
                                          seed0=500 + opts.seed, rng=rng, should_stop=should_stop,
                                          tick=lambda f=family: log(f"  tour de DAgger terminé, modèle {METHOD_LABELS[f]} réajusté"),

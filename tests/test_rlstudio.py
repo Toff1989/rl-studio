@@ -2,7 +2,9 @@ import json
 
 import numpy as np
 import pytest
-from gymnasium.utils.env_checker import check_env
+
+pytest.importorskip("gymnasium")
+from gymnasium.utils.env_checker import check_env  # noqa: E402
 
 from rlstudio.envs import expressions
 from rlstudio.envs.loader import make_baseline, make_env
@@ -88,6 +90,7 @@ def test_cartpole_physics_and_baseline(store):
     assert np.mean([episode_length(baseline, s) for s in range(5)]) > 3 * np.mean([episode_length(zero, s) for s in range(5)])
 
 
+@pytest.mark.runtime
 def test_short_training_run(store):
     p = store.create("t", "python_blank")
     p.cfg["algo"].update(total_timesteps=300, baseline_episodes=1)

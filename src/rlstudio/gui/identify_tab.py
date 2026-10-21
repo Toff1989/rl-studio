@@ -15,15 +15,65 @@ from PySide6.QtWidgets import (
 
 from ..identify import METHOD_LABELS, METHODS
 from ..identify.pipeline import ensure_files, identify_dir
+from .notify import looks_like_error, summarize
 from .runner import IdentifyRunner, RuntimeMissing, WorkerJob
 from .theme import C
-from .widgets import Card, button, label, scroll_page
+from .widgets import Card, button, header_tips, label, scroll_page, tips
 
 MODES = [("steady", "Régime permanent : entrées -> sorties  (y = f(u))"), ("dynamic", "Dynamique : x(k+1) = x(k) + f(x, u)")]
 IN_COLS = ["Balayer", "Entrée", "Min", "Max", "Valeur fixée"]
 STEADY_COLS = ["Modèle", "Complexité", "R2", "NRMSE", "Erreur max", ""]
 DYN_COLS = ["Modèle", "Complexité", "R2 un pas", "Fidélité sim. libre", "NRMSE", ""]
-
+IN_COL_TIPS = [
+    "Cochée : l'entrée varie entre Min et Max pendant le balayage. Décochée : elle reste à sa valeur fixée et n'est plus une entrée du modèle.",
+    "Nom de l'entrée (action du projet).",
+    "Borne basse de la plage balayée (dans les bornes de l'action).",
+    "Borne haute de la plage balayée (dans les bornes de l'action).",
+    "Valeur maintenue pour une entrée non balayée.",
+]
+STEADY_COL_TIPS = [
+    "Famille du modèle.",
+    "Nombre de termes ou de paramètres : plus il est petit, plus le modèle est simple.",
+    "R2 : part de la variation des sorties reproduite par le modèle sur les points de validation (1 = parfait).",
+    "Erreur quadratique moyenne normalisée sur les points de validation (0 = parfait).",
+    "Plus grand écart observé entre le modèle et le système sur les points de validation.",
+    "Le modèle recommandé est le plus simple dont l'erreur reste dans la tolérance.",
+]
+DYN_COL_TIPS = [
+    "Famille du modèle.",
+    "Nombre de termes ou de paramètres : plus il est petit, plus le modèle est simple.",
+    "R2 de la prédiction du pas suivant à partir de l'état réel.",
+    "Qualité du modèle quand il tourne seul sur un épisode entier, sans être recalé sur le système (1 = parfait). C'est le critère le plus exigeant.",
+    "Erreur quadratique moyenne normalisée (0 = parfait).",
+    "Le modèle recommandé est le plus simple dont la fidélité reste dans la tolérance.",
+]
+METHOD_TIPS = {
+    "linear": "Modèle linéaire : chaque sortie est une combinaison linéaire des entrées. Très lisible, mais ne représente pas les non-linéarités.",
+    "polynomial": "Polynômes des entrées (degrés réglables ci-dessous), termes croisés inclus.",
+    "sparse": "Équation parcimonieuse (SINDy) : retrouve une formule avec peu de termes (sin, cos, tanh, valeur absolue, produits…).",
+    "neural": "Petit réseau de neurones : le plus souple, mais pas lisible comme une équation.",
+}
+FIELD_TIPS = {
+    "Points d'apprentissage": "Nombre de points d'entrée simulés (plan d'expérience en hypercube latin) pour ajuster les modèles.",
+    "Points de validation": "Points neufs, jamais utilisés pour l'ajustement, qui servent à mesurer la qualité des modèles.",
+    "Part aux bornes": "Part des points placés aux bornes des plages (extrêmes), pour bien couvrir les limites de fonctionnement.",
+    "Stabilisation : tol. relative": "Une sortie est stabilisée quand elle varie de moins de ce pourcentage (relatif) pendant les pas consécutifs stables.",
+    "Stabilisation : tol. absolue": "Variation absolue maximale tolérée pour une sortie stabilisée (utile quand la sortie est proche de zéro).",
+    "Pas consécutifs stables": "Nombre de pas de suite pendant lesquels les sorties doivent rester stables pour déclarer le point établi.",
+    "Durée max d'établissement (pas)": "Nombre maximal de pas simulés par point en attendant la stabilisation. Les points qui n'ont pas convergé sont écartés. 0 = durée d'un épisode.",
+    "Épisodes d'apprentissage": "Épisodes simulés avec des paliers d'action aléatoires, pour collecter des données.",
+    "Épisodes de validation": "Épisodes neufs qui servent à valider chaque modèle en simulation libre.",
+    "Tours de collecte en plus": "Tours supplémentaires de collecte qui ajoutent des données (et tracent une courbe d'apprentissage). 0 = aucun.",
+    "Épisodes / tour": "Nombre d'épisodes de chaque tour de collecte supplémentaire.",
+    "Palier max (pas)": "Durée maximale, en pas, pendant laquelle une action aléatoire est maintenue constante.",
+    "Pas max / épisode": "Limite la durée des épisodes de balayage, en pas. 0 = durée d'un épisode.",
+    "Degrés du polynôme": "Degrés des polynômes testés (un modèle par degré), séparés par des virgules. Ex. : 2, 3.",
+    "Seuils parcimonieux (SINDy)": "Seuils de la régression parcimonieuse, séparés par des virgules : plus le seuil est grand, moins le modèle garde de termes.",
+    "Couches cachées (réseau)": "Neurones par couche cachée du réseau (activation tanh), séparés par des virgules. Ex. : 32, 32.",
+    "Époques (réseau)": "Nombre de passages d'apprentissage du réseau sur les données. Plus c'est grand, plus c'est long et précis.",
+    "Tolérance de recommandation": "Écart d'erreur toléré : le modèle le plus simple dont la qualité reste dans cette tolérance est recommandé.",
+    "Graine": "Fixe le hasard (tirage des points, initialisation du réseau) pour obtenir le même résultat à chaque fois.",
+}
 
 def _floats(text, what):
     try:
@@ -48,6 +98,7 @@ def _spin(lo, hi, val, dec=None, suffix=""):
 
 class IdentifyTab(QWidget):
     busy = Signal(bool)
+    error = Signal(str, str)  # (résumé, détail) : une erreur à montrer dans le bandeau de la fenêtre principale
 
     def __init__(self, settings, parent=None):
         super().__init__(parent)
@@ -70,6 +121,7 @@ class IdentifyTab(QWidget):
         meth = QHBoxLayout()
         for m in METHODS:
             cb = QCheckBox(METHOD_LABELS[m])
+            cb.setToolTip(METHOD_TIPS.get(m, ""))
             cb.setChecked(True)
             self.method_boxes[m] = cb
             meth.addWidget(cb)
@@ -78,6 +130,7 @@ class IdentifyTab(QWidget):
         # entrees / sorties
         self.in_table = QTableWidget(0, len(IN_COLS))
         self.in_table.setHorizontalHeaderLabels(IN_COLS)
+        header_tips(self.in_table, IN_COL_TIPS)
         self.in_table.verticalHeader().setVisible(False)
         self.in_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.in_table.setMaximumHeight(190)
@@ -112,13 +165,10 @@ class IdentifyTab(QWidget):
         self.f_epochs = _spin(1, 100000, 400)
         self.f_margin = _spin(0, 50, 2, 1, " %")
         self.f_seed = _spin(0, 10 ** 6, 0)
-        self.f_poly.setToolTip("Degrés des polynômes testés (un modèle par degré)")
-        self.f_sparse.setToolTip("Seuils de la régression parcimonieuse (SINDy) : plus grand = moins de termes")
-        self.f_hidden.setToolTip("Neurones par couche cachée du réseau (tanh)")
 
         self.steady_box = self._grid_card("Balayage en régime permanent", [
             ("Points d'apprentissage", self.s_samples), ("Points de validation", self.s_val), ("Part aux bornes", self.s_extreme),
-            ("Stabilisation : tol. relative", self.s_rtol), ("Stabilisation : tol. absolue", self.s_atol), ("Pas consecutifs stables", self.s_window),
+            ("Stabilisation : tol. relative", self.s_rtol), ("Stabilisation : tol. absolue", self.s_atol), ("Pas consécutifs stables", self.s_window),
             ("Durée max d'établissement (pas)", self.s_settle)], extra=self.s_scenario,
             hint="Chaque point est simulé, entrées constantes, jusqu'à stabilisation des sorties ; les points qui ne convergent pas sont écartés.")
         self.dyn_box = self._grid_card("Balayage dynamique", [
@@ -238,6 +288,35 @@ class IdentifyTab(QWidget):
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.addWidget(scroll_page(inner))
+        tips(self, {
+            "mode": "Régime permanent : carte statique entrées → sorties une fois le système stabilisé (rapide et lisible). "
+                    "Dynamique : x(k+1) = x(k) + f(x, u), pour les systèmes qui n'ont pas de régime permanent (instables, oscillants).",
+            "in_table": "Entrées du modèle = actions du projet. Cochez « Balayer » pour les faire varier entre Min et Max ; décochées, elles restent à leur valeur fixée.",
+            "out_list": "Sorties à modéliser (observations du projet). Décochez celles qui ne vous intéressent pas.",
+            "btn_read": "Relit la liste des entrées et des sorties du projet (pour un projet Python, l'environnement est lancé une fois pour les lire).",
+            "s_scenario": "Les variables « état initial aléatoire » (perturbations) deviennent des entrées supplémentaires du modèle.",
+            "btn_start": "Lance l'identification avec les réglages ci-dessus. Aucun entraînement ni politique n'est nécessaire.",
+            "btn_stop": "Interrompt l'identification en cours.",
+            "progress": "Avancement de l'identification.",
+            "stage": "Étape en cours.",
+            "timing": "Temps écoulé et estimation du temps restant.",
+            "status": "Résultat de l'identification.",
+            "logbox": "Journal détaillé de l'identification. Les erreurs s'affichent aussi dans le bandeau en haut de la fenêtre.",
+            "result_combo": "Historique des identifications du projet (la plus récente en premier).",
+            "plot_out": "Sortie (régime permanent) affichée dans le graphique de droite.",
+            "pareto": "Qualité en fonction de la complexité (échelle logarithmique) : cherchez le modèle le plus simple qui reste précis. En vert : le modèle recommandé.",
+            "detail": "Régime permanent : valeurs du modèle contre valeurs du système sur les points de validation (la diagonale = modèle parfait). "
+                      "Dynamique : erreur selon l'horizon de prédiction (en pas).",
+            "equations": "Équations ou description du modèle sélectionné.",
+            "notes": "Remarques et avertissements sur l'identification (points écartés, limites du modèle…).",
+            "summary": "Résumé de l'identification sélectionnée.",
+            "table": "Modèles identifiés, du plus simple au plus complexe. Cliquez sur une ligne pour voir ses équations et ses graphiques.",
+            "btn_copy_py": "Copie le code Python du modèle sélectionné dans le presse-papiers.",
+            "btn_copy_m": "Copie le code MATLAB du modèle sélectionné dans le presse-papiers.",
+            "btn_save": "Enregistre le modèle sélectionné dans un fichier (Python, MATLAB, équations ou JSON).",
+            "btn_slx": "Crée un modèle Simulink (bloc MATLAB Function) contenant le modèle sélectionné (MATLAB requis).",
+            "btn_open": "Affiche dans l'Explorateur le dossier des fichiers de cette identification.",
+        })
         self._set_result_buttons(False)
         self._mode_changed()
         self.restyle()
@@ -247,7 +326,8 @@ class IdentifyTab(QWidget):
         grid = QGridLayout()
         grid.setHorizontalSpacing(14)
         for i, (txt, w) in enumerate(fields):
-            grid.addWidget(label(txt, "sectionLabel"), (i // 4) * 2, i % 4)
+            w.setToolTip(FIELD_TIPS[txt])
+            grid.addWidget(label(txt, "sectionLabel", tip=FIELD_TIPS[txt]), (i // 4) * 2, i % 4)
             grid.addWidget(w, (i // 4) * 2 + 1, i % 4)
         card.body.addLayout(grid)
         if extra is not None:
@@ -304,9 +384,16 @@ class IdentifyTab(QWidget):
         if not self.project:
             return
         self.job = WorkerJob(self.settings, ["env-signals", "--project", str(self.project.path)], self)
-        self.job.done.connect(lambda res, err: self._fill_signals(res) if res else self.status.setText(f"ERREUR : {err}"))
+        self.job.done.connect(self._signals_done)
         self.status.setText("Lecture des signaux du projet ...")
         self.job.start()
+
+    def _signals_done(self, res, err):
+        if res:
+            self._fill_signals(res)
+            return
+        self.status.setText("Lecture des signaux impossible : " + summarize(err))
+        self.error.emit("Lecture des signaux impossible : " + summarize(err), err)
 
     def _fill_signals(self, sig):
         self.signals = sig
@@ -327,10 +414,13 @@ class IdentifyTab(QWidget):
             self.in_table.setItem(r, 2, QTableWidgetItem(f"{a['low']:g}"))
             self.in_table.setItem(r, 3, QTableWidgetItem(f"{a['high']:g}"))
             self.in_table.setItem(r, 4, QTableWidgetItem(f"{(a['low'] + a['high']) / 2:g}"))
+            for c in range(5):
+                self.in_table.item(r, c).setToolTip(IN_COL_TIPS[c])
         for n in sig["observations"]:
             it = QListWidgetItem(n)
             it.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
             it.setCheckState(Qt.Checked)
+            it.setToolTip("Cochée : cette sortie sera modélisée.")
             self.out_list.addItem(it)
         self.status.setText("")
 
@@ -362,10 +452,10 @@ class IdentifyTab(QWidget):
             try:
                 lo, hi, val = (float(self.in_table.item(r, c).text().replace(",", ".")) for c in (2, 3, 4))
             except ValueError:
-                raise ValueError(f"Entree {name} : Min, Max et Valeur fixée doivent être des nombres.") from None
+                raise ValueError(f"Entrée {name} : Min, Max et Valeur fixée doivent être des nombres.") from None
             if self.in_table.item(r, 0).checkState() == Qt.Checked:
                 if not lo < hi:
-                    raise ValueError(f"Entree {name} : Min doit être inférieur à Max.")
+                    raise ValueError(f"Entrée {name} : Min doit être inférieur à Max.")
                 if (lo, hi) != (lo0, hi0):
                     ranges[name] = [lo, hi]
             else:
@@ -485,6 +575,8 @@ class IdentifyTab(QWidget):
 
     def _on_log(self, text):
         self.logbox.appendPlainText(text.rstrip())
+        if looks_like_error(text):
+            self.error.emit(summarize(text), text)
 
     def _on_progress(self, stage, fraction):
         self._fraction = fraction
@@ -519,7 +611,8 @@ class IdentifyTab(QWidget):
         self.timing.setText(f"Durée : {self._fmt(elapsed)}")
         if message.startswith("ERREUR"):
             self.logbox.appendPlainText(message)
-            self.status.setText("Échec de l'identification : voir le journal ci-dessus.")
+            self.status.setText("Échec de l'identification : " + summarize(message))
+            self.error.emit("Échec de l'identification : " + summarize(message), message)
             return
         self.status.setText("Identification terminée." if message.startswith("Terminé") else "Identification arrêtée.")
         if message.startswith("Terminé"):
@@ -572,8 +665,9 @@ class IdentifyTab(QWidget):
         cols = STEADY_COLS if steady else DYN_COLS
         self.table.setColumnCount(len(cols))
         self.table.setHorizontalHeaderLabels(cols)
+        header_tips(self.table, STEADY_COL_TIPS if steady else DYN_COL_TIPS)
         if steady:
-            self.summary.setText(f"{rep['n_train']} points d'apprentissage, {rep['n_val']} de validation, {rep['dropped']} ecarte(s) ; entrées : "
+            self.summary.setText(f"{rep['n_train']} points d'apprentissage, {rep['n_val']} de validation, {rep['dropped']} écarté(s) ; entrées : "
                                  f"{', '.join(rep['in_names'])} ; sorties : {', '.join(rep['out_names'])}. Du {rep['created']} ({rep['duration_s']:.0f} s).")
         else:
             self.summary.setText(f"{rep['n_train']} transitions d'apprentissage, {rep['n_val']} de validation, pas de temps {rep['dt']:g} s. "
@@ -707,11 +801,18 @@ class IdentifyTab(QWidget):
         args = ["export-identify-simulink", "--project", str(self.project.path), "--report", self.report_dir.name, "--candidate", c["id"],
                 "--out", target]
         self.job = WorkerJob(self.settings, args, self)
-        self.job.done.connect(lambda res, err: self.status.setText(f"Modèle Simulink créé : {res['path']}" if res else f"ERREUR : {err}"))
+        self.job.done.connect(self._simulink_done)
         self.job.done.connect(lambda *_: self.btn_slx.setEnabled(True))
         self.btn_slx.setEnabled(False)
         self.status.setText("Génération du modèle Simulink (démarrage de MATLAB) ...")
         self.job.start()
+
+    def _simulink_done(self, res, err):
+        if res:
+            self.status.setText(f"Modèle Simulink créé : {res['path']}")
+            return
+        self.status.setText("Échec de l'export Simulink : " + summarize(err))
+        self.error.emit("Échec de l'export Simulink : " + summarize(err), err)
 
     def _open_dir(self):
         if self.report_dir and sys.platform == "win32" and self.report_dir.exists():

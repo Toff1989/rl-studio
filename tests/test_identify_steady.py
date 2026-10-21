@@ -149,6 +149,7 @@ def test_simulink_block_export_static_and_dynamic(report, tmp_path):
 
 def test_template_usine_identification_end_to_end(tmp_path):
     """Projet Python fourni : l'identification retrouve les formules exactes, resultats ranges dans le projet, puis dans un .rls."""
+    pytest.importorskip("gymnasium")
     from rlstudio.archive import export_project, import_project
     from rlstudio.identify import run_steady
     from rlstudio.paths import TEMPLATES_DIR

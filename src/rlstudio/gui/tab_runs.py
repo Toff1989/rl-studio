@@ -1,4 +1,4 @@
-"""Onglet Resultats (liste des entrainements)."""
+"""Onglet Résultats : liste des entraînements du projet."""
 import json
 import os
 import sys
@@ -9,11 +9,11 @@ from PySide6.QtWidgets import (
 )
 
 from .theme import C
-from .widgets import Card, button, fmt_run_date, label
+from .widgets import Card, button, fmt_run_date, label, tips
 
 
 class RunsTab:
-    """Methodes de MainWindow (onglet resultats)."""
+    """Méthodes de MainWindow (onglet Résultats)."""
 
     def _tab_runs(self):
         self.runs_list = QListWidget()
@@ -35,6 +35,14 @@ class RunsTab:
         self.run_cfg.setObjectName("mono")
         self.run_cfg.setReadOnly(True)
         self.btn_run_dir = button("Ouvrir le dossier du run", None, self._open_run_folder)
+        tips(self, {
+            "runs_list": "Les entraînements du projet, du plus récent au plus ancien. Cliquez sur l'un d'eux pour voir ses détails.",
+            "runs_empty": "Aucun entraînement n'a encore été lancé pour ce projet.",
+            "run_title": "Date de l'entraînement sélectionné.",
+            "run_info": "Modèle enregistré ou non, et récompense moyenne de la politique de référence.",
+            "run_cfg": "Configuration exacte utilisée pour cet entraînement (copie du fichier project.yaml de l'époque).",
+            "btn_run_dir": "Affiche dans l'Explorateur le dossier de cet entraînement (modèle, configuration, résultats d'extraction).",
+        })
         detail = Card()
         detail.body.addWidget(self.run_title)
         detail.body.addWidget(self.run_info)
@@ -64,7 +72,7 @@ class RunsTab:
             base = d / "baseline.json"
             if base.exists():
                 try:
-                    sub.append(f"reference {json.loads(base.read_text(encoding='utf-8'))['mean']:.2f}")
+                    sub.append(f"référence {json.loads(base.read_text(encoding='utf-8'))['mean']:.2f}")
                 except Exception:
                     pass
             sub.append("modèle ✓" if (d / "model.zip").exists() else "sans modèle")

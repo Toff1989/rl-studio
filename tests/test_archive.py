@@ -194,6 +194,7 @@ def test_invalid_kind_is_rejected(tmp_path, other):
 
 
 # -- interface -----------------------------------------------------------------------------
+@pytest.mark.gui
 def test_gui_import_with_and_without_confirmation(project, tmp_path):
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     from PySide6.QtWidgets import QApplication

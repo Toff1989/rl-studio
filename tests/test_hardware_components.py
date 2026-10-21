@@ -81,7 +81,7 @@ def test_matlab_plan(tmp_path):
     old = hardware.inspect_matlab(fake_matlab(tmp_path, "R2023a", "23.1.0.1", py=("3.8", "3.9", "3.10")))
     assert not components.plan_matlab(hw(matlab=[old]))["enabled"]  # Python embarque 3.12 non supporte
     partial = hardware.inspect_matlab(fake_matlab(tmp_path, "R2025a", "25.1.0.1", complete=False))
-    assert "incomplete" in components.plan_matlab(hw(matlab=[partial]))["reason"].lower()
+    assert "incomplèt" in components.plan_matlab(hw(matlab=[partial]))["reason"].lower()
     assert not components.plan_matlab(hw(matlab=[ok]), enabled=False)["enabled"]
     assert not components.plan_matlab(hw())["enabled"]
 
@@ -112,6 +112,7 @@ def test_provision_skip_heavy_components(tmp_path):
 
 
 # -- worker en sous-processus -------------------------------------------------------------
+@pytest.mark.runtime
 def test_worker_train_emits_json_events(tmp_path):
     from rlstudio.paths import TEMPLATES_DIR
     from rlstudio.project import ProjectStore

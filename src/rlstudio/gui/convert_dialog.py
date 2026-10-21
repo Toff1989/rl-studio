@@ -1,8 +1,8 @@
-"""Fenetre « Convertir un modele Simulink » : prepare un modele existant pour RL Studio et cree le projet.
+"""Fenêtre « Convertir un modèle Simulink » : prépare un modèle existant pour RL Studio et crée le projet.
 
-Quatre etapes : modele (analyse), actions, observations et variables initiales, reglages (pas, recompense).
-Le modele d'origine n'est jamais modifie : le worker (`convert-model`) en enregistre une copie convertie dans un nouveau
-projet, puis la teste a vide. La logique (validation, project.yaml) est dans rlstudio/convert.py.
+Quatre étapes : modèle (analyse), actions, observations et variables initiales, réglages (pas, récompense).
+Le modèle d'origine n'est jamais modifié : le worker (`convert-model`) en enregistre une copie convertie dans un nouveau
+projet, puis la teste à vide. La logique (validation, project.yaml) est dans rlstudio/convert.py.
 """
 import json
 import tempfile
@@ -19,10 +19,22 @@ from ..convert import sanitize_name, validate_conversion
 from .explorer import SimulinkExplorer
 from .runner import WorkerJob
 from .theme import C
-from .widgets import Card, button, label
+from .widgets import Card, button, form_row, header_tips, label, tip, tips
 
 STEPS = ["Modèle", "Actions", "Observations", "Réglages"]
 
+COL_TIPS = {
+    "use": "Décochez pour ne pas utiliser cette ligne.",
+    "name": "Nom donné à ce signal dans le projet (lettres, chiffres et _ ; utilisable dans la récompense).",
+    "source": "Origine du signal dans le modèle Simulink.",
+    "kind": "Type de l'entrée du modèle.",
+    "default": "Valeur de l'action avant que l'agent ne commande (valeur initiale).",
+    "low": "Valeur minimale (borne basse).",
+    "high": "Valeur maximale (borne haute).",
+    "port": "Numéro du port de sortie du bloc (1 pour le premier).",
+    "variable": "Variable du modèle qui sera tirée au hasard au début de chaque épisode.",
+    "value": "Valeur actuelle de la variable dans le modèle.",
+}
 
 class RowTable(QTableWidget):
     """Table de lignes cochables. `cols` : [(cle, titre, genre)], genre = "check" | "text" | "float" | "ro"."""
@@ -31,6 +43,7 @@ class RowTable(QTableWidget):
         super().__init__(0, len(cols))
         self.cols = cols
         self.setHorizontalHeaderLabels([c[1] for c in cols])
+        header_tips(self, [COL_TIPS.get(c[0]) for c in cols])
         self.horizontalHeader().setStretchLastSection(True)
         self.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         self.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
@@ -59,6 +72,8 @@ class RowTable(QTableWidget):
                 item = QTableWidgetItem("" if v is None else (f"{v:g}" if isinstance(v, float) else str(v)))
                 if kind == "ro":
                     item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+            if COL_TIPS.get(key):
+                item.setToolTip(COL_TIPS[key])
             self.setItem(row, j, item)
         self.meta.append(meta or {})
 
@@ -105,10 +120,10 @@ class ConvertDialog(QDialog):
         self.stack = QStackedWidget()
         for page in (self._page_model(), self._page_actions(), self._page_observations(), self._page_settings()):
             self.stack.addWidget(page)
-        self.btn_back = button("Précédent", None, self._back)
-        self.btn_next = button("Suivant", "primary", self._next)
-        self.btn_cancel = button("Annuler", "ghost", self.reject)
-        self.status = label("", "muted", wrap=True)
+        self.btn_back = button("Précédent", None, self._back, tip="Revient à l'étape précédente.")
+        self.btn_next = button("Suivant", "primary", self._next, tip="Passe à l'étape suivante. Sur la dernière étape, crée le projet converti et le teste à vide.")
+        self.btn_cancel = button("Annuler", "ghost", self.reject, tip="Ferme l'assistant sans rien créer.")
+        self.status = label("", "muted", wrap=True, tip="Progression de l'analyse ou de la conversion.")
         foot = QHBoxLayout()
         foot.addWidget(self.btn_cancel)
         foot.addWidget(self.status, 1)
@@ -131,13 +146,20 @@ class ConvertDialog(QDialog):
         self.f_model.setPlaceholderText("Modèle Simulink (.slx ou .mdl)")
         self.f_init = QLineEdit()
         self.f_init.setPlaceholderText("Optionnel : script .m ou fichier .mat qui définit les variables du modèle")
-        self.btn_analyze = button("Analyser le modèle", "primary", self._analyze)
+        self.btn_analyze = button("Analyser le modèle", "primary", self._analyze,
+                                  tip="Ouvre le modèle dans MATLAB pour repérer ses entrées, ses sorties, son solveur et les variables manquantes (quelques dizaines de secondes).")
+        tips(self, {
+            "f_model": "Fichier du modèle Simulink à convertir (.slx ou .mdl). Il n'est jamais modifié : une copie est créée dans le nouveau projet.",
+            "f_init": "Facultatif : script .m ou fichier .mat qui définit les variables dont dépend le modèle. Il est exécuté tel quel dans MATLAB avant l'analyse.",
+        })
         r1, r2 = QHBoxLayout(), QHBoxLayout()
         r1.addWidget(self.f_model, 1)
-        r1.addWidget(button("Parcourir...", None, lambda: self._browse(self.f_model, "Modèle Simulink", "Simulink (*.slx *.mdl)")))
+        r1.addWidget(button("Parcourir...", None, lambda: self._browse(self.f_model, "Modèle Simulink", "Simulink (*.slx *.mdl)"),
+                            tip="Choisit le fichier du modèle Simulink."))
         r2.addWidget(self.f_init, 1)
         r2.addWidget(button("Parcourir...", None, lambda: self._browse(self.f_init, "Script d'initialisation",
-                                                                        "MATLAB (*.m *.mat)")))
+                                                                        "MATLAB (*.m *.mat)"),
+                            tip="Choisit le script .m ou le fichier .mat d'initialisation."))
         pick = Card("Modèle à convertir", "Le script d'initialisation est exécuté tel quel dans MATLAB avant l'analyse : "
                                           "indique-le si le modèle utilise des variables définies hors du .slx.")
         pick.body.addLayout(r1)
@@ -152,6 +174,11 @@ class ConvertDialog(QDialog):
         self.warnings.setPlaceholderText("Les avertissements de l'analyse s'affichent ici.")
         self.removable = QListWidget()
         self.removable.setMaximumHeight(120)
+        tips(self, {
+            "summary": "Résumé de l'analyse : entrées, sorties, constantes, solveur.",
+            "warnings": "Avertissements de l'analyse (variables manquantes, signaux de bus non pris en charge…).",
+            "removable": "Blocs d'affichage (scopes…) ou liens cassés qui seront retirés de la copie pour accélérer les simulations.",
+        })
         res = Card("Résultat de l'analyse")
         res.body.addWidget(self.summary)
         res.body.addWidget(self.warnings)
@@ -171,8 +198,10 @@ class ConvertDialog(QDialog):
                                    ("kind", "Type", "ro"), ("default", "Valeur init.", "float"),
                                    ("low", "Min", "float"), ("high", "Max", "float")])
         row = QHBoxLayout()
-        row.addWidget(button("Ajouter un paramètre de bloc...", None, self._explore))
-        row.addWidget(button("Retirer la ligne", "ghost", self.t_actions.remove_selected))
+        row.addWidget(button("Ajouter un paramètre de bloc...", None, self._explore,
+                             tip="Ouvre l'arbre des blocs du modèle pour choisir un paramètre numérique que l'agent pilotera (ex. le gain d'un bloc Gain)."))
+        row.addWidget(button("Retirer la ligne", "ghost", self.t_actions.remove_selected, tip="Retire du tableau la ligne sélectionnée."))
+        self.t_actions.setToolTip("Actions proposées à partir des entrées du modèle. Décochez « Utiliser » pour en écarter une ; double-cliquez pour changer un nom ou des bornes.")
         row.addStretch(1)
         card = Card("Actions : ce que l'agent commande",
                     "Chaque entrée du modèle devient une constante pilotable par l'agent ; un paramètre de bloc "
@@ -185,8 +214,10 @@ class ConvertDialog(QDialog):
         self.t_obs = RowTable([("use", "Utiliser", "check"), ("name", "Nom", "text"), ("source", "Source", "ro"),
                                ("port", "Port", "float")])
         orow = QHBoxLayout()
-        orow.addWidget(button("Ajouter un signal...", None, self._explore))
-        orow.addWidget(button("Retirer la ligne", "ghost", self.t_obs.remove_selected))
+        orow.addWidget(button("Ajouter un signal...", None, self._explore,
+                              tip="Ouvre l'arbre des blocs du modèle pour choisir un signal supplémentaire à observer."))
+        orow.addWidget(button("Retirer la ligne", "ghost", self.t_obs.remove_selected, tip="Retire du tableau la ligne sélectionnée."))
+        self.t_obs.setToolTip("Observations proposées à partir des sorties du modèle. Décochez « Utiliser » pour en écarter une.")
         orow.addStretch(1)
         cobs = Card("Observations : ce que l'agent voit",
                     "Les sorties du modèle sont proposées ; tu peux ajouter n'importe quel signal. Une sortie est "
@@ -198,6 +229,7 @@ class ConvertDialog(QDialog):
         cinit = Card("Variables initiales aléatoires (optionnel)",
                      "Variables du modèle tirées au hasard à chaque épisode (ex. angle de départ). Les variables définies "
                      "hors du .slx sont de toute façon copiées dans le modèle converti.")
+        self.t_init.setToolTip("Variables du modèle tirées au hasard dans [Min, Max] au début de chaque épisode, pour varier les situations de départ. Cochez celles à utiliser.")
         cinit.body.addWidget(self.t_init, 1)
         w = QWidget()
         v = QVBoxLayout(w)
@@ -236,17 +268,23 @@ class ConvertDialog(QDialog):
         form = QFormLayout()
         form.setLabelAlignment(Qt.AlignLeft)
         form.setSpacing(10)
-        form.addRow("Nom du projet", self.f_name)
-        form.addRow("Pas de décision", self.s_step)
-        form.addRow("Durée d'un épisode", self.s_episode)
-        form.addRow("Solveur", self.c_solver)
-        form.addRow("Pas du solveur", self.s_solver)
+        form_row(form, "Nom du projet", self.f_name, "Nom du nouveau projet qui contiendra la copie convertie du modèle.")
+        form_row(form, "Pas de décision", self.s_step,
+                 "Temps simulé entre deux décisions de l'agent. Plus il est petit, plus l'agent réagit finement, mais plus l'entraînement est long.")
+        form_row(form, "Durée d'un épisode", self.s_episode, "Temps simulé d'un essai complet, du départ à la fin (sauf arrêt anticipé).")
+        form_row(form, "Solveur", self.c_solver,
+                 "Pas fixe : recommandé, car l'état du modèle se conserve d'un pas de décision à l'autre. « Garder le solveur du modèle » conserve ses réglages d'origine.")
+        form_row(form, "Pas du solveur", self.s_solver, "Pas de calcul interne du solveur à pas fixe. Il doit diviser le pas de décision.")
         c1 = Card("Réglages", "Le pas de décision est le temps simulé entre deux actions de l'agent.")
         c1.body.addLayout(form)
         form2 = QFormLayout()
         form2.setSpacing(10)
-        form2.addRow("Récompense", self.f_reward)
-        form2.addRow("Arrêt anticipé", self.f_term)
+        form_row(form2, "Récompense", self.f_reward,
+                 "Expression calculée à chaque pas : plus elle est grande, mieux c'est. Utilisez les noms des actions et des observations, plus t, dt et step.")
+        form_row(form2, "Arrêt anticipé", self.f_term,
+                 "Condition facultative qui termine l'épisode dès qu'elle est vraie (ex. abs(y) > 50).")
+        tips(self, {"names_hint": "Noms utilisables dans la récompense et l'arrêt anticipé.",
+                    "check_lbl": "Résultat de la vérification de la configuration."})
         c2 = Card("Récompense", "Expression calculée à chaque pas : plus elle est grande, mieux c'est.")
         c2.body.addLayout(form2)
         c2.body.addWidget(self.names_hint)
@@ -346,8 +384,8 @@ class ConvertDialog(QDialog):
         n_const, n_var = len(a.get("constants") or []), len(a.get("variables") or [])
         sol = a.get("solver") or {}
         self.summary.setText(
-            f"<b>{a.get('model', '')}</b> : {n_in} entree(s), {n_out} sortie(s), {n_const} constante(s) numerique(s), "
-            f"{n_var} variable(s) utilisee(s).<br>Solveur : {sol.get('type', '?')} ({sol.get('name', '?')}), "
+            f"<b>{a.get('model', '')}</b> : {n_in} entrée(s), {n_out} sortie(s), {n_const} constante(s) numérique(s), "
+            f"{n_var} variable(s) utilisée(s).<br>Solveur : {sol.get('type', '?')} ({sol.get('name', '?')}), "
             f"pas {sol.get('step', '?')}.")
         self.warnings.setPlainText("\n".join(a.get("warnings") or []) or "Aucun avertissement.")
         self.removable.clear()

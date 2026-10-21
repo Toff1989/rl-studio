@@ -1,15 +1,15 @@
-"""Onglet Projet (fiche, indicateurs)."""
+"""Onglet Projet : fiche du projet et indicateurs."""
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QHBoxLayout, QLineEdit, QPlainTextEdit, QVBoxLayout,
 )
 
-from .widgets import Card, Kpi, button, column, fmt_run_date, label, scroll_page
+from .widgets import Card, Kpi, button, column, fmt_run_date, label, scroll_page, tips
 
 
 class ProjectTab:
-    """Methodes de MainWindow (onglet projet)."""
+    """Méthodes de MainWindow (onglet Projet)."""
 
     def _tab_general(self):
         self.f_name = QLineEdit()
@@ -35,12 +35,25 @@ class ProjectTab:
         row = QHBoxLayout()
         row.setSpacing(10)
         row.addWidget(self.btn_go_train)
-        row.addWidget(button("Modifier l'environnement", None, lambda: self.tabs.setCurrentIndex(1)))
-        row.addWidget(button("Ouvrir le dossier", "ghost", self._open_folder))
+        row.addWidget(button("Modifier l'environnement", None, lambda: self.tabs.setCurrentIndex(1),
+                             tip="Ouvre l'onglet Environnement : système à piloter, observations, actions, récompense."))
+        row.addWidget(button("Ouvrir le dossier", "ghost", self._open_folder, tip="Affiche le dossier du projet dans l'Explorateur de fichiers."))
         row.addStretch()
         self.v_path = label("", "muted")
         self.v_path.setTextInteractionFlags(Qt.TextSelectableByMouse)
 
+        tips(self, {
+            "f_name": "Nom du projet. Il s'affiche dans la liste de gauche ; le dossier du projet garde son nom d'origine.",
+            "f_desc": "Note libre : système contrôlé, critère à optimiser, hypothèses… Elle est enregistrée avec le projet.",
+            "k_kind": "Python : environnement écrit en code (fichier env.py). Simulink : modèle décrit sans code.",
+            "k_algo": "Algorithme d'apprentissage du projet (réglable dans l'onglet Algorithme).",
+            "k_steps": "Durée de l'entraînement, en pas de simulation (réglable dans l'onglet Algorithme).",
+            "k_runs": "Nombre d'entraînements enregistrés dans le projet (voir l'onglet Résultats).",
+            "k_last": "Date du dernier entraînement.",
+            "v_env": "Résumé de l'environnement. Pour le modifier, utilisez l'onglet Environnement.",
+            "v_path": "Date de création et emplacement du projet sur le disque.",
+            "btn_go_train": "Ouvre l'onglet Entraînement pour lancer l'apprentissage.",
+        })
         self.f_name.textChanged.connect(self._mark_dirty)
         self.f_desc.textChanged.connect(self._mark_dirty)
         fields = QVBoxLayout()
