@@ -54,7 +54,7 @@ def test_validate_conversion_ok_and_errors():
     assert any("Récompense" in e for e in convert.validate_conversion(_spec(reward="-(z - 1)**2")))  # nom inconnu
     assert any("pas du solveur" in e.lower() for e in convert.validate_conversion(_spec(solver_step=1.0)))
     assert any("pisode" in e.lower() for e in convert.validate_conversion(_spec(episode_s=0.1)))
-    assert any("recompense" in e.lower() for e in convert.validate_conversion(_spec(reward="")))
+    assert any("récompense" in e.lower() for e in convert.validate_conversion(_spec(reward="")))
 
 
 def test_matlab_spec_only_converts_inports():
