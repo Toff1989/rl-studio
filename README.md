@@ -21,6 +21,10 @@
   <img alt="format .rls" src="https://img.shields.io/badge/projets-.rls-8b93a7">
 </p>
 
+<p align="center">
+  <img src="docs/media/rlstudio-promo.gif" width="800" alt="Présentation animée de RL Studio : construire, entraîner, comprendre">
+</p>
+
 ## Fonctionnalités
 
 - **Gestion de projets** : créer, dupliquer, renommer, supprimer (corbeille récupérable), un dossier par projet.
